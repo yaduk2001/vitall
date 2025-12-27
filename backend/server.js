@@ -1745,9 +1745,13 @@ app.delete('/api/notifications/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to delete notification' });
   }
 });
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌍 Environment: ${NODE_ENV}`);
-  console.log(`🔗 Frontend URL: ${FRONTEND_URL}`);
-  console.log(`🗄️ Database: MongoDB Atlas`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🌍 Environment: ${NODE_ENV}`);
+    console.log(`🔗 Frontend URL: ${FRONTEND_URL}`);
+    console.log(`🗄️ Database: MongoDB Atlas`);
+  });
+}
+
+module.exports = app;
