@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pydantic
+sentence-transformers
+faiss-cpu
+requests
+PyPDF2
+protobuf==3.20.3
+python-multipart

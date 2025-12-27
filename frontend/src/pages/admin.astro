@@ -1,0 +1,259 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout>
+	<section class="admin-page">
+		<header class="admin-header">
+			<h1>Admin Dashboard</h1>
+			<div class="admin-actions">
+				<button id="refreshBtn" class="btn">Refresh</button>
+				<button id="logoutBtn" class="btn secondary">Logout</button>
+			</div>
+		</header>
+
+		<div class="admin-content">
+			<div class="tabs">
+				<button class="tab active" data-tab="users">All Users</button>
+				<button class="tab" data-tab="organizations">Tutor Requests</button>
+			</div>
+
+			<div class="tab-content">
+				<div id="users-tab" class="tab-panel active">
+					<h2>All Users</h2>
+					<div class="table-container">
+						<table class="users-table">
+							<thead>
+								<tr>
+									<th>Name</th>
+									<th>Email</th>
+									<th>Role</th>
+									<th>Status</th>
+									<th>Joined</th>
+								</tr>
+							</thead>
+							<tbody id="users-list">
+								<tr><td colspan="5">Loading...</td></tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+
+				<div id="organizations-tab" class="tab-panel">
+					<h2>Tutor Requests</h2>
+					<div class="table-container">
+						<table class="orgs-table">
+							<thead>
+								<tr>
+									<th>Tutor</th>
+									<th>Email</th>
+									<th>Status</th>
+									<th>Requested</th>
+									<th>Actions</th>
+								</tr>
+							</thead>
+							<tbody id="orgs-list">
+								<tr><td colspan="5">Loading...</td></tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+</Layout>
+
+<script>
+const BASE_URL = import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:5000';
+
+function authHeader() {
+	const token = localStorage.getItem('token');
+	return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+
+async function checkAdminAccess() {
+	try {
+		const res = await fetch(`${BASE_URL}/api/auth/me`, { headers: authHeader() });
+		if (!res.ok) throw new Error('Not authenticated');
+		const user = await res.json();
+		if (user.role !== 'admin') {
+			alert('Admin access required');
+			location.href = '/login';
+			return false;
+		}
+		return true;
+	} catch (err) {
+		alert('Please login as admin');
+		location.href = '/login';
+		return false;
+	}
+}
+
+async function loadUsers() {
+	try {
+		const res = await fetch(`${BASE_URL}/api/auth/admin/users`, { headers: authHeader() });
+		const data = await res.json();
+		const tbody = document.getElementById('users-list');
+		tbody.innerHTML = '';
+		
+		data.users.forEach(user => {
+			const row = document.createElement('tr');
+			row.innerHTML = `
+				<td>${user.fullName}</td>
+				<td>${user.email}</td>
+				<td><span class="role-badge ${user.role}">${user.role}</span></td>
+				<td><span class="status-badge ${user.isApproved ? 'approved' : 'pending'}">${user.isApproved ? 'Approved' : 'Pending'}</span></td>
+				<td>${new Date(user.createdAt).toLocaleDateString()}</td>
+			`;
+			tbody.appendChild(row);
+		});
+	} catch (err) {
+		console.error('Failed to load users:', err);
+		document.getElementById('users-list').innerHTML = '<tr><td colspan="5">Failed to load users</td></tr>';
+	}
+}
+
+async function loadOrganizations() {
+	try {
+		const res = await fetch(`${BASE_URL}/api/auth/admin/organizations`, { headers: authHeader() });
+		const data = await res.json();
+		const tbody = document.getElementById('orgs-list');
+		tbody.innerHTML = '';
+		
+		data.organizations.forEach(org => {
+			const row = document.createElement('tr');
+			row.innerHTML = `
+				<td>${org.fullName}</td>
+				<td>${org.email}</td>
+				<td><span class="status-badge ${org.isApproved ? 'approved' : 'pending'}">${org.isApproved ? 'Approved' : 'Pending'}</span></td>
+				<td>${new Date(org.createdAt).toLocaleDateString()}</td>
+				<td>
+					${!org.isApproved ? `
+						<button class="btn small approve" data-id="${org._id}">Approve</button>
+						<button class="btn small reject" data-id="${org._id}">Reject</button>
+					` : 'Approved'}
+				</td>
+			`;
+			tbody.appendChild(row);
+		});
+	} catch (err) {
+		console.error('Failed to load organizations:', err);
+		document.getElementById('orgs-list').innerHTML = '<tr><td colspan="5">Failed to load organizations</td></tr>';
+	}
+}
+
+async function approveUser(userId) {
+	try {
+		const res = await fetch(`${BASE_URL}/api/auth/admin/approve/${userId}`, {
+			method: 'POST',
+			headers: authHeader()
+		});
+		if (res.ok) {
+			alert('User approved successfully');
+			loadOrganizations();
+		} else {
+			alert('Failed to approve user');
+		}
+	} catch (err) {
+		alert('Failed to approve user');
+	}
+}
+
+async function rejectUser(userId) {
+	if (!confirm('Are you sure you want to reject this tutor?')) return;
+	try {
+		const res = await fetch(`${BASE_URL}/api/auth/admin/reject/${userId}`, {
+			method: 'POST',
+			headers: authHeader()
+		});
+		if (res.ok) {
+			alert('User rejected');
+			loadOrganizations();
+		} else {
+			alert('Failed to reject user');
+		}
+	} catch (err) {
+		alert('Failed to reject user');
+	}
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', async () => {
+	const isAdmin = await checkAdminAccess();
+	if (!isAdmin) return;
+
+	// Tab switching
+	document.querySelectorAll('.tab').forEach(tab => {
+		tab.addEventListener('click', () => {
+			document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+			document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+			
+			tab.classList.add('active');
+			document.getElementById(tab.dataset.tab + '-tab').classList.add('active');
+			
+			if (tab.dataset.tab === 'users') loadUsers();
+			else if (tab.dataset.tab === 'organizations') loadOrganizations();
+		});
+	});
+
+	// Action buttons
+	document.getElementById('refreshBtn').addEventListener('click', () => {
+		const activeTab = document.querySelector('.tab.active').dataset.tab;
+		if (activeTab === 'users') loadUsers();
+		else if (activeTab === 'organizations') loadOrganizations();
+	});
+
+	document.getElementById('logoutBtn').addEventListener('click', () => {
+		localStorage.removeItem('token');
+		localStorage.removeItem('user');
+		location.href = '/login';
+	});
+
+	// Tutor actions
+	document.addEventListener('click', (e) => {
+		if (e.target.classList.contains('approve')) {
+			approveUser(e.target.dataset.id);
+		} else if (e.target.classList.contains('reject')) {
+			rejectUser(e.target.dataset.id);
+		}
+	});
+
+	// Load initial data
+	loadUsers();
+});
+</script>
+
+<style>
+.admin-page { padding: 2rem; max-width: 1200px; margin: 0 auto; }
+.admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+.admin-header h1 { margin: 0; color: #0d47a1; }
+.admin-actions { display: flex; gap: 1rem; }
+
+.tabs { display: flex; border-bottom: 1px solid #e5e7eb; margin-bottom: 1.5rem; }
+.tab { padding: 0.75rem 1.5rem; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; }
+.tab.active { border-bottom-color: #0d47a1; color: #0d47a1; font-weight: 600; }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.table-container { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
+th { background: #f9fafb; font-weight: 600; color: #374151; }
+
+.role-badge { padding: 0.25rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+.role-badge.student { background: #dbeafe; color: #1e40af; }
+.role-badge.organization { background: #dcfce7; color: #166534; }
+.role-badge.admin { background: #fef3c7; color: #92400e; }
+
+.status-badge { padding: 0.25rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+.status-badge.approved { background: #dcfce7; color: #166534; }
+.status-badge.pending { background: #fef3c7; color: #92400e; }
+
+.btn { padding: 0.5rem 1rem; border: 1px solid #d1d5db; background: #0d47a1; color: white; border-radius: 6px; cursor: pointer; font-weight: 600; }
+.btn.secondary { background: #6b7280; }
+.btn.small { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+.btn.approve { background: #059669; }
+.btn.reject { background: #dc2626; }
+.btn:hover { opacity: 0.9; }
+</style>

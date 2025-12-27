@@ -1,0 +1,447 @@
+---
+// BackendConnection.astro
+---
+
+<div class="backend-connection">
+  <h2>🔗 Backend + MongoDB Atlas Connection</h2>
+  
+  <div class="status-section">
+    <h3>Server Health Check</h3>
+    <div id="health-status" class="status-indicator">Checking...</div>
+    <button id="check-health" class="btn">Check Health</button>
+  </div>
+
+  <div class="messages-section">
+    <h3>Messages from MongoDB Atlas</h3>
+    <div id="messages-list" class="messages-list">
+      <div class="loading">Loading messages...</div>
+    </div>
+    <button id="refresh-messages" class="btn">Refresh Messages</button>
+  </div>
+
+  <div class="send-message-section">
+    <h3>Send Message to MongoDB Atlas</h3>
+    <div class="input-group">
+      <input type="text" id="sender-input" placeholder="Your name (optional)" class="sender-input">
+      <input type="text" id="message-input" placeholder="Type your message..." class="message-input">
+      <button id="send-message" class="btn btn-primary">Send</button>
+    </div>
+  </div>
+
+  <div class="search-section">
+    <h3>Search Messages</h3>
+    <div class="input-group">
+      <input type="text" id="search-input" placeholder="Search messages..." class="search-input">
+      <button id="search-messages" class="btn btn-secondary">Search</button>
+    </div>
+    <div id="search-results" class="search-results"></div>
+  </div>
+</div>
+
+<script>
+  // Backend API configuration
+  const API_CONFIG = {
+    BASE_URL: import.meta.env.PUBLIC_BACKEND_URL || 'http://localhost:5000',
+    ENDPOINTS: {
+      HEALTH: '/api/health',
+      MESSAGES: '/api/messages',
+      SEARCH: '/api/messages/search',
+      ROOT: '/'
+    }
+  };
+
+  // Helper function to build API URLs
+  const buildApiUrl = (endpoint) => {
+    return `${API_CONFIG.BASE_URL}${endpoint}`;
+  };
+
+  // Helper function to make API requests
+  const apiRequest = async (endpoint, options = {}) => {
+    const url = buildApiUrl(endpoint);
+    const config = {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      ...options
+    };
+
+    try {
+      const response = await fetch(url, config);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('API request failed:', error);
+      throw error;
+    }
+  };
+
+  // DOM elements
+  const healthStatus = document.getElementById('health-status');
+  const checkHealthBtn = document.getElementById('check-health');
+  const messagesList = document.getElementById('messages-list');
+  const refreshMessagesBtn = document.getElementById('refresh-messages');
+  const senderInput = document.getElementById('sender-input');
+  const messageInput = document.getElementById('message-input');
+  const sendMessageBtn = document.getElementById('send-message');
+  const searchInput = document.getElementById('search-input');
+  const searchBtn = document.getElementById('search-messages');
+  const searchResults = document.getElementById('search-results');
+
+  // Check backend health
+  const checkHealth = async () => {
+    try {
+      healthStatus.textContent = 'Checking...';
+      healthStatus.className = 'status-indicator checking';
+      
+      const data = await apiRequest(API_CONFIG.ENDPOINTS.HEALTH);
+      
+      healthStatus.textContent = `✅ ${data.status} (${data.environment}) - ${data.database}`;
+      healthStatus.className = 'status-indicator success';
+    } catch (error) {
+      healthStatus.textContent = '❌ Connection failed';
+      healthStatus.className = 'status-indicator error';
+    }
+  };
+
+  // Load messages from MongoDB
+  const loadMessages = async () => {
+    try {
+      messagesList.innerHTML = '<div class="loading">Loading messages from MongoDB Atlas...</div>';
+      
+      const data = await apiRequest(API_CONFIG.ENDPOINTS.MESSAGES);
+      
+      if (data.messages && data.messages.length > 0) {
+        const messagesHtml = data.messages.map(msg => `
+          <div class="message-item">
+            <div class="message-header">
+              <span class="message-sender">${msg.sender}</span>
+              <span class="message-timestamp">${new Date(msg.timestamp).toLocaleString()}</span>
+            </div>
+            <div class="message-text">${msg.text}</div>
+          </div>
+        `).join('');
+        
+        messagesList.innerHTML = `
+          <div class="messages-count">${data.count} messages found</div>
+          ${messagesHtml}
+        `;
+      } else {
+        messagesList.innerHTML = '<div class="no-messages">No messages found in database</div>';
+      }
+    } catch (error) {
+      messagesList.innerHTML = '<div class="error">Failed to load messages from MongoDB</div>';
+    }
+  };
+
+  // Send message to MongoDB
+  const sendMessage = async () => {
+    const text = messageInput.value.trim();
+    const sender = senderInput.value.trim() || 'Anonymous';
+    
+    if (!text) return;
+
+    try {
+      sendMessageBtn.disabled = true;
+      sendMessageBtn.textContent = 'Sending...';
+      
+      const data = await apiRequest(API_CONFIG.ENDPOINTS.MESSAGES, {
+        method: 'POST',
+        body: JSON.stringify({ text, sender })
+      });
+      
+      messageInput.value = '';
+      senderInput.value = '';
+      await loadMessages(); // Refresh the messages list
+      
+      // Show success message
+      const successMsg = document.createElement('div');
+      successMsg.className = 'success-message';
+      successMsg.textContent = 'Message saved to MongoDB Atlas!';
+      document.querySelector('.send-message-section').appendChild(successMsg);
+      
+      setTimeout(() => {
+        successMsg.remove();
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    } finally {
+      sendMessageBtn.disabled = false;
+      sendMessageBtn.textContent = 'Send';
+    }
+  };
+
+  // Search messages
+  const searchMessages = async () => {
+    const query = searchInput.value.trim();
+    if (!query) return;
+
+    try {
+      searchBtn.disabled = true;
+      searchBtn.textContent = 'Searching...';
+      
+      const data = await apiRequest(`${API_CONFIG.ENDPOINTS.SEARCH}/${encodeURIComponent(query)}`);
+      
+      if (data.messages && data.messages.length > 0) {
+        const searchHtml = data.messages.map(msg => `
+          <div class="message-item search-result">
+            <div class="message-header">
+              <span class="message-sender">${msg.sender}</span>
+              <span class="message-timestamp">${new Date(msg.timestamp).toLocaleString()}</span>
+            </div>
+            <div class="message-text">${msg.text}</div>
+          </div>
+        `).join('');
+        
+        searchResults.innerHTML = `
+          <div class="search-summary">Found ${data.count} results for "${query}"</div>
+          ${searchHtml}
+        `;
+      } else {
+        searchResults.innerHTML = `<div class="no-results">No messages found for "${query}"</div>`;
+      }
+    } catch (error) {
+      searchResults.innerHTML = '<div class="error">Search failed</div>';
+    } finally {
+      searchBtn.disabled = false;
+      searchBtn.textContent = 'Search';
+    }
+  };
+
+  // Event listeners
+  checkHealthBtn.addEventListener('click', checkHealth);
+  refreshMessagesBtn.addEventListener('click', loadMessages);
+  sendMessageBtn.addEventListener('click', sendMessage);
+  searchBtn.addEventListener('click', searchMessages);
+  
+  messageInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      sendMessage();
+    }
+  });
+  
+  searchInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      searchMessages();
+    }
+  });
+
+  // Initial load
+  checkHealth();
+  loadMessages();
+</script>
+
+<style>
+  .backend-connection {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  h2 {
+    color: #333;
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  h3 {
+    color: #555;
+    margin-bottom: 1rem;
+  }
+
+  .status-section,
+  .messages-section,
+  .send-message-section,
+  .search-section {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+  }
+
+  .status-indicator {
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-weight: 500;
+  }
+
+  .status-indicator.checking {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+  }
+
+  .status-indicator.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+  }
+
+  .status-indicator.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+  }
+
+  .btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+  }
+
+  .btn:hover {
+    background: #0056b3;
+  }
+
+  .btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: #28a745;
+  }
+
+  .btn-primary:hover {
+    background: #218838;
+  }
+
+  .btn-secondary {
+    background: #6c757d;
+  }
+
+  .btn-secondary:hover {
+    background: #545b62;
+  }
+
+  .messages-list {
+    margin-bottom: 1rem;
+  }
+
+  .messages-count {
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 0.5rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    text-align: center;
+    font-weight: 500;
+  }
+
+  .message-item {
+    background: white;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+  }
+
+  .message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .message-sender {
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.9rem;
+  }
+
+  .message-timestamp {
+    font-size: 0.8rem;
+    color: #6c757d;
+  }
+
+  .message-text {
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  .search-result {
+    border-left: 4px solid #007bff;
+  }
+
+  .loading,
+  .no-messages,
+  .error,
+  .no-results {
+    text-align: center;
+    padding: 1rem;
+    color: #6c757d;
+  }
+
+  .error {
+    color: #dc3545;
+  }
+
+  .input-group {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .sender-input,
+  .message-input,
+  .search-input {
+    padding: 0.5rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 0.9rem;
+  }
+
+  .sender-input {
+    flex: 0 0 150px;
+  }
+
+  .message-input {
+    flex: 1;
+  }
+
+  .search-input {
+    flex: 1;
+  }
+
+  .sender-input:focus,
+  .message-input:focus,
+  .search-input:focus {
+    outline: none;
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  }
+
+  .success-message {
+    background: #d4edda;
+    color: #155724;
+    padding: 0.75rem;
+    border-radius: 4px;
+    margin-top: 1rem;
+    text-align: center;
+    border: 1px solid #c3e6cb;
+  }
+
+  .search-summary {
+    background: #e8f5e8;
+    color: #2e7d32;
+    padding: 0.5rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    text-align: center;
+    font-weight: 500;
+  }
+
+  .search-results {
+    margin-top: 1rem;
+  }
+</style>
