@@ -74,11 +74,29 @@ app.get('/api/health', (req, res) => {
 });
 
 // Serve uploads (for backward compatibility)
-const uploadsDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+// Serve uploads (for backward compatibility)
+let uploadsDir;
+try {
+  // In Vercel/Serverless, we can only write to /tmp
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    uploadsDir = path.join('/tmp', 'uploads');
+  } else {
+    uploadsDir = path.join(process.cwd(), 'uploads');
+  }
+
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+} catch (error) {
+  console.warn('Warning: Could not create uploads directory', error);
+  // Fallback to avoid crashing, though uploads won't work
+  uploadsDir = path.join(os.tmpdir(), 'uploads');
 }
-app.use('/uploads', express.static(uploadsDir));
+
+// Only serve static files if directory exists (avoid crashing app.use)
+if (uploadsDir && fs.existsSync(uploadsDir)) {
+  app.use('/uploads', express.static(uploadsDir));
+}
 
 // Serve Base64 data from Atlas as files
 app.get('/api/files/:id/:type', async (req, res) => {
