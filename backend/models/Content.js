@@ -9,7 +9,7 @@ const ContentSchema = new mongoose.Schema({
     contentUrl: { type: String, required: true },
     duration: { type: Number, default: 0 },
     views: { type: Number, default: 0 },
-    likes: { type: Number, default: 0 },
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     tags: [{ type: String }],
     metadata: {
         singer: { type: String, default: '' },

@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import Toast from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 
 const Organization: React.FC = () => {
   const { id } = useParams();
@@ -11,6 +13,7 @@ const Organization: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'courses' | 'about'>('courses');
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [activeSection, setActiveSection] = useState('hero');
+  const { toasts, removeToast, showSuccess, showError, showWarning, showInfo } = useToast();
 
   const navItems = useMemo(
     () => [
@@ -54,7 +57,7 @@ const Organization: React.FC = () => {
       let currentUser: any = null;
       try {
         currentUser = userJson ? JSON.parse(userJson) : null;
-      } catch {}
+      } catch { }
 
       const updateEnrollmentButtonStates = async () => {
         if (!currentUser || currentUser.role !== 'student') return;
@@ -154,16 +157,16 @@ const Organization: React.FC = () => {
     let currentUser: any = null;
     try {
       currentUser = userJson ? JSON.parse(userJson) : null;
-    } catch {}
+    } catch { }
 
     if (!currentUser) {
-      alert('Please login as student to enroll in courses');
+      showError('Please login as student to enroll in courses');
       window.location.href = '/login';
       return;
     }
 
     if (currentUser.role !== 'student') {
-      alert('Only students can enroll in courses');
+      showError('Only students can enroll in courses');
       return;
     }
 
@@ -173,7 +176,7 @@ const Organization: React.FC = () => {
         const { subscriptions } = await subRes.json();
         const isCurrentlySubscribed = subscriptions.some((sub: any) => sub.tutorId === id);
         if (!isCurrentlySubscribed) {
-          alert('Please subscribe to this channel first before enrolling in courses.');
+          showWarning('Please subscribe to this channel first before enrolling in courses.');
           return;
         }
       }
@@ -187,7 +190,7 @@ const Organization: React.FC = () => {
         const existingEnrollData = await existingEnrollRes.json();
         const isAlreadyEnrolled = existingEnrollData.enrollments?.some((enr: any) => enr.courseId === courseId);
         if (isAlreadyEnrolled) {
-          alert('You are already enrolled in this course!');
+          showInfo('You are already enrolled in this course!');
           window.location.href = `/video/${courseId}`;
           return;
         }
@@ -209,17 +212,17 @@ const Organization: React.FC = () => {
           btn.className = 'enroll-btn enrolled';
           btn.disabled = true;
         }
-        alert('Enrolled successfully! Redirecting to course...');
+        showSuccess('Enrolled successfully! Redirecting to course...');
         setTimeout(() => {
           window.location.href = `/video/${courseId}`;
         }, 1000);
       } else {
         const errorData = await enrollRes.json().catch(() => ({}));
-        alert(`Enroll failed: ${errorData.error || 'Unknown error'}`);
+        showError(`Enroll failed: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Enrollment error:', error);
-      alert('Failed to enroll. Please try again.');
+      showError('Failed to enroll. Please try again.');
     }
   };
 
@@ -229,16 +232,16 @@ const Organization: React.FC = () => {
     let currentUser: any = null;
     try {
       currentUser = userJson ? JSON.parse(userJson) : null;
-    } catch {}
+    } catch { }
 
     if (!currentUser) {
-      alert('Please login as a student to subscribe to this channel');
+      showError('Please login as a student to subscribe to this channel');
       window.location.href = '/login';
       return;
     }
 
     if (currentUser.role !== 'student') {
-      alert('Only students can subscribe to channels');
+      showError('Only students can subscribe to channels');
       return;
     }
 
@@ -263,17 +266,17 @@ const Organization: React.FC = () => {
       if (res.ok) {
         setIsSubscribed(!isSubscribed);
         if (isSubscribed) {
-          alert('Successfully unsubscribed from this channel!');
+          showSuccess('Successfully unsubscribed from this channel!');
         } else {
-          alert('Successfully subscribed to this channel!');
+          showSuccess('Successfully subscribed to this channel!');
         }
       } else {
         const errorData = await res.json().catch(() => ({}));
-        alert(`${isSubscribed ? 'Unsubscribe' : 'Subscribe'} failed: ${errorData.error || 'Unknown error'}`);
+        showError(`${isSubscribed ? 'Unsubscribe' : 'Subscribe'} failed: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Subscription error:', error);
-      alert(`Failed to ${isSubscribed ? 'unsubscribe' : 'subscribe'}. Please try again.`);
+      showError(`Failed to ${isSubscribed ? 'unsubscribe' : 'subscribe'}. Please try again.`);
     } finally {
       setSubscribing(false);
     }
@@ -1614,6 +1617,18 @@ const Organization: React.FC = () => {
           }
         }
       `}</style>
+
+      {/* Toast Notifications */}
+      <div className="fixed top-6 right-6 z-[100] space-y-3">
+        {toasts.map(toast => (
+          <Toast
+            key={toast.id}
+            message={toast.message}
+            type={toast.type}
+            onClose={() => removeToast(toast.id)}
+          />
+        ))}
+      </div>
     </div>
   );
 };

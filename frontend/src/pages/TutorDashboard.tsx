@@ -1,7 +1,11 @@
 import React, { useEffect } from 'react';
 import ProfileMenu from '../components/ProfileMenu';
+import MobileSidebar from '../components/MobileSidebar';
+import { useState } from 'react';
 
 const TutorDashboard: React.FC = () => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   useEffect(() => {
     const BASE_URL = (import.meta as any).env.PUBLIC_BACKEND_URL || 'http://localhost:5000';
     async function loadDashboard() {
@@ -41,6 +45,12 @@ const TutorDashboard: React.FC = () => {
     <div className="main-container bg-gray-50 font-sans">
       <div className="topbar">
         <div className="topbar-left logo-effect">
+          <button
+            className="md:hidden lg:hidden p-2 mr-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+            onClick={() => setIsMobileMenuOpen(true)}
+          >
+            <i className="fas fa-bars text-xl"></i>
+          </button>
           <a href="/Tutordashboard" className="flex items-center space-x-2">
             <img src="/src/assets/logo.jpg" alt="Logo" className="w-8 h-8 rounded-lg object-cover" />
           </a>
@@ -177,6 +187,20 @@ const TutorDashboard: React.FC = () => {
         </main>
       </div>
 
+      <MobileSidebar
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        title={<span className="text-xl font-bold text-blue-600">Vital Tutor</span>}
+        links={[
+          { icon: 'fa-upload', label: 'Upload Course', path: '/CourseUploadPage' },
+          { icon: 'fa-chart-bar', label: 'Analytics', path: '/analytics' },
+          { icon: 'fa-comments', label: 'Comments', path: '/tutor-comments' },
+          { icon: 'fa-dollar-sign', label: 'Monetization', path: '/Monetization' },
+          { icon: 'fa-edit', label: 'Edit Uploads', path: '/EditUploadsPage' },
+          { icon: 'fa-cog', label: 'Channel Setup', path: '/channel-setup' },
+        ]}
+      />
+
       <style>{`
       :root { --primary-blue:#2563eb; --dark-blue:#1d4ed8; --border-radius:8px; --border-color:#000000; --hover-bg:#1d4ed8; --text-black:#000000; --text-white:#ffffff; --bg-light-gray:#f9fafb; }
       .nav-item { transition: all .2s ease-in-out; color: var(--text-black); }
@@ -190,6 +214,14 @@ const TutorDashboard: React.FC = () => {
       .sidebar { width:256px; height:calc(100vh - 64px); position:fixed; left:0; top:64px; z-index:10; }
       .main-content { margin-left:257px; height:100vh; padding-top:64px; }
       .t-vertical { position:fixed; top:64px; bottom:0; left:256px; width:1px; background-color: var(--border-color); z-index:15; pointer-events:none; }
+      
+      @media (max-width: 768px) {
+        .sidebar, .t-vertical { display: none; }
+        .main-content { margin-left: 0; }
+        .topbar-left { width: auto; padding-left: 16px; }
+        .topbar-right { padding: 0 16px; }
+        h1 { font-size: 1.25rem; }
+      }
       `}</style>
     </div>
   );

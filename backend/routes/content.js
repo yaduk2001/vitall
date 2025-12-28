@@ -73,9 +73,57 @@ router.get('/:id', async (req, res) => {
         content.views += 1;
         await content.save();
 
-        res.json(content);
+        const formattedContent = content.toObject();
+        // Handle legacy likes (number) vs new likes (array)
+        if (typeof formattedContent.likes === 'number') {
+            formattedContent.likeCount = formattedContent.likes;
+            formattedContent.likes = [];
+        } else {
+            formattedContent.likeCount = formattedContent.likes ? formattedContent.likes.length : 0;
+            formattedContent.likes = formattedContent.likes || [];
+        }
+
+        res.json(formattedContent);
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch content details' });
+    }
+});
+
+// POST /api/content/:id/like - Toggle like on content
+router.post('/:id/like', authMiddleware, async (req, res) => {
+    try {
+        const content = await Content.findById(req.params.id);
+        if (!content) return res.status(404).json({ error: 'Content not found' });
+
+        const userId = req.user.id;
+
+        // Handle migration from number to array if needed
+        if (typeof content.likes === 'number') {
+            content.likes = []; // Reset old count to array
+        }
+
+        // Initialize if undefined
+        if (!content.likes) content.likes = [];
+
+        const likeIndex = content.likes.indexOf(userId);
+
+        if (likeIndex === -1) {
+            // Like
+            content.likes.push(userId);
+        } else {
+            // Unlike
+            content.likes.splice(likeIndex, 1);
+        }
+
+        await content.save();
+
+        res.json({
+            likes: content.likes.length,
+            isLiked: likeIndex === -1
+        });
+    } catch (e) {
+        console.error('Error toggling content like:', e);
+        res.status(500).json({ error: 'Failed to like content' });
     }
 });
 

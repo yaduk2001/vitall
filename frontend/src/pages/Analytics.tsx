@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import ProfileMenu from '../components/ProfileMenu';
+import MobileSidebar from '../components/MobileSidebar';
 
 const Analytics: React.FC = () => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [analytics, setAnalytics] = useState({
     subscribers: 0,
     courses: 0,
@@ -17,7 +19,7 @@ const Analytics: React.FC = () => {
         const userStr = localStorage.getItem('user');
         const user = userStr ? JSON.parse(userStr) : null;
         if (!user) return;
-        
+
         const res = await fetch(`${BASE_URL}/api/analytics/tutor/${user.id || user._id}`);
         if (res.ok) {
           const data = await res.json();
@@ -33,7 +35,7 @@ const Analytics: React.FC = () => {
     const handleNavHover = () => {
       const navItems = document.querySelectorAll('.nav-item');
       const activeItem = document.querySelector('.nav-item.active-nav');
-      
+
       navItems.forEach(item => {
         item.addEventListener('mouseenter', () => {
           if (!item.classList.contains('active-nav')) {
@@ -46,7 +48,7 @@ const Analytics: React.FC = () => {
             item.classList.add('temp-hover');
           }
         });
-        
+
         item.addEventListener('mouseleave', () => {
           if (!item.classList.contains('active-nav')) {
             // Remove hover styling
@@ -67,6 +69,12 @@ const Analytics: React.FC = () => {
     <div className="main-container bg-gray-50 font-sans">
       <div className="topbar">
         <div className="topbar-left logo-effect">
+          <button
+            className="md:hidden lg:hidden p-2 mr-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+            onClick={() => setIsMobileMenuOpen(true)}
+          >
+            <i className="fas fa-bars text-xl"></i>
+          </button>
           <a href="/Tutordashboard" className="flex items-center space-x-2">
             <img src="/src/assets/logo.jpg" alt="Logo" className="w-8 h-8 rounded-lg object-cover" />
           </a>
@@ -114,7 +122,7 @@ const Analytics: React.FC = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="lg:col-span-1">
                 <h3 className="text-lg font-medium text-black mb-4">Total Courses</h3>
                 <div className="curved-box bg-white">
@@ -129,7 +137,7 @@ const Analytics: React.FC = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="lg:col-span-1">
                 <h3 className="text-lg font-medium text-black mb-4">Total Enrollments</h3>
                 <div className="curved-box bg-white">
@@ -145,7 +153,7 @@ const Analytics: React.FC = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
               <div>
                 <h3 className="text-lg font-medium text-black mb-4">Total Views</h3>
@@ -161,7 +169,7 @@ const Analytics: React.FC = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div>
                 <h3 className="text-lg font-medium text-black mb-4">Revenue</h3>
                 <div className="curved-box bg-white">
@@ -181,6 +189,18 @@ const Analytics: React.FC = () => {
         </main>
       </div>
 
+      <MobileSidebar
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        title={<span className="text-xl font-bold text-blue-600">Analytics</span>}
+        links={[
+          { icon: 'fa-upload', label: 'Upload Course', path: '/CourseUploadPage' },
+          { icon: 'fa-chart-bar', label: 'Analytics', path: '/analytics', active: true },
+          { icon: 'fa-dollar-sign', label: 'Monetization', path: '/Monetization' },
+          { icon: 'fa-edit', label: 'Edit Uploads', path: '/EditUploadsPage' },
+        ]}
+      />
+
       <style>{`
       :root { --primary-blue:#2563eb; --dark-blue:#1d4ed8; --border-radius:8px; --border-color:#000000; --hover-bg:#1d4ed8; --text-black:#000000; --text-white:#ffffff; --bg-light-gray:#f9fafb; }
       .nav-item { transition: all .2s ease-in-out; color: var(--text-black); border-radius: var(--border-radius); }
@@ -196,6 +216,13 @@ const Analytics: React.FC = () => {
       .sidebar { width:256px; height:calc(100vh - 64px); position:fixed; left:0; top:64px; z-index:10; }
       .main-content { margin-left:257px; height:100vh; padding-top:64px; }
       .t-vertical { position:fixed; top:64px; bottom:0; left:256px; width:1px; background-color: var(--border-color); z-index:15; pointer-events:none; }
+      
+      @media (max-width: 768px) {
+        .sidebar, .t-vertical { display: none; }
+        .main-content { margin-left: 0; }
+        .topbar-left { width: auto; padding-left: 16px; }
+        .topbar-right { padding: 0 16px; }
+      }
       `}</style>
     </div>
   );

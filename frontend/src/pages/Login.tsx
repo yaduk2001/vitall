@@ -1,12 +1,15 @@
 import React, { useRef, useState } from 'react';
 import { API_CONFIG, login } from '../config/api';
 import { Link, useNavigate } from 'react-router-dom';
+import Toast from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 
 const Login: React.FC = () => {
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string>('');
   const navigate = useNavigate();
+  const { toasts, removeToast, showSuccess, showError, showWarning, showInfo } = useToast();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -20,14 +23,14 @@ const Login: React.FC = () => {
         if (res.user.isApproved) {
           navigate('/Tutordashboard');
         } else {
-          alert('Your organization account is pending admin approval. Please wait for approval.');
+          showWarning('Your organization account is pending admin approval. Please wait for approval.');
           navigate('/home');
         }
       } else if (res.user.role === 'content_creator') {
         if (res.user.isApproved) {
           navigate('/CreatorDashboard');
         } else {
-          alert('Your creator account is pending verification. Please wait for approval.');
+          showWarning('Your creator account is pending verification. Please wait for approval.');
           navigate('/home');
         }
       }
@@ -244,6 +247,20 @@ const Login: React.FC = () => {
         animation: fadeInScale 0.6s ease;
         transform-style: preserve-3d;
         perspective: 1000px;
+      }
+      
+      @media (max-width: 768px) {
+        .auth-container {
+          grid-template-columns: 1fr;
+          margin: 1rem;
+          min-height: auto;
+        }
+        .left-panel {
+          display: none;
+        }
+        .right-panel {
+          padding: 2rem;
+        }
       }
 
       @keyframes fadeInScale {
@@ -1168,6 +1185,18 @@ const Login: React.FC = () => {
       }
       @media (max-width: 980px) { .auth-container { grid-template-columns: 1fr; min-height: 70vh; margin:1rem; } .left-panel { display:none; } .auth-container::before{display:none;} .form{max-width:100%;} }
       `}</style>
+
+      {/* Toast Notifications */}
+      <div className="fixed top-6 right-6 z-[100] space-y-3">
+        {toasts.map(toast => (
+          <Toast
+            key={toast.id}
+            message={toast.message}
+            type={toast.type}
+            onClose={() => removeToast(toast.id)}
+          />
+        ))}
+      </div>
     </section>
   );
 };

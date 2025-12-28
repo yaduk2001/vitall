@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import ProfileMenu from '../components/ProfileMenu';
+import MobileSidebar from '../components/MobileSidebar';
 
 const CreatorDashboard: React.FC = () => {
     const [user, setUser] = useState<any>(null);
     const [content, setContent] = useState<any[]>([]);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     useEffect(() => {
         const u = JSON.parse(localStorage.getItem('user') || 'null');
@@ -33,6 +35,13 @@ const CreatorDashboard: React.FC = () => {
             {/* Topbar - Red & White Theme */}
             <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-30 shadow-sm">
                 <div className="flex items-center space-x-3">
+                    <button
+                        className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg mr-2"
+                        onClick={() => setIsMobileMenuOpen(true)}
+                    >
+                        <i className="fas fa-bars text-xl"></i>
+                    </button>
+
                     <div className="w-8 h-8 rounded bg-red-600 flex items-center justify-center text-white font-bold text-xs shadow-md">
                         ▶
                     </div>
@@ -89,13 +98,13 @@ const CreatorDashboard: React.FC = () => {
                                 </a>
                             </li>
                             <li>
-                                <a className="flex items-center space-x-3 px-4 py-3 rounded-lg font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all border-l-4 border-transparent hover:border-red-500" href="/analytics">
+                                <a className="flex items-center space-x-3 px-4 py-3 rounded-lg font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all border-l-4 border-transparent hover:border-red-500" href="/creator/analytics">
                                     <i className="fas fa-chart-line text-sm w-5 text-center"></i>
                                     <span>Analytics</span>
                                 </a>
                             </li>
                             <li>
-                                <a className="flex items-center space-x-3 px-4 py-3 rounded-lg font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all border-l-4 border-transparent hover:border-red-500" href="/settings">
+                                <a className="flex items-center space-x-3 px-4 py-3 rounded-lg font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all border-l-4 border-transparent hover:border-red-500" href="/creator/settings">
                                     <i className="fas fa-cog text-sm w-5 text-center"></i>
                                     <span>Settings</span>
                                 </a>
@@ -190,7 +199,7 @@ const CreatorDashboard: React.FC = () => {
                                             <div
                                                 key={item._id}
                                                 className="grid grid-cols-12 p-4 items-center hover:bg-red-50 transition-colors cursor-pointer group"
-                                                onClick={() => window.location.href = `/watch/${item._id}`}
+                                                onClick={() => window.location.href = `/watch/${item._id}?ref=creator`}
                                             >
                                                 <div className="col-span-6 flex items-start gap-4">
                                                     <div className="w-28 aspect-video bg-gray-100 rounded overflow-hidden relative border border-gray-200 flex-shrink-0">
@@ -250,7 +259,24 @@ const CreatorDashboard: React.FC = () => {
                     </div>
                 </div>
             </div>
-        </div>
+
+            <MobileSidebar
+                isOpen={isMobileMenuOpen}
+                onClose={() => setIsMobileMenuOpen(false)}
+                user={user}
+                title={
+                    <span className="text-xl font-bold text-gray-800">
+                        Studio <span className="text-red-600">Pro</span>
+                    </span>
+                }
+                links={[
+                    { icon: 'fa-columns', label: 'Dashboard', path: '/CreatorDashboard', active: true },
+                    { icon: 'fa-video', label: 'Content', path: '/ContentUploadPage' },
+                    { icon: 'fa-chart-line', label: 'Analytics', path: '/creator/analytics' },
+                    { icon: 'fa-cog', label: 'Settings', path: '/creator/settings' },
+                ]}
+            />
+        </div >
     );
 };
 

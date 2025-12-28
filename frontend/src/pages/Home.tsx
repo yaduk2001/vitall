@@ -7,6 +7,7 @@ import CourseCard, { Course } from '../components/dashboard/CourseCard';
 import SubscriptionRow from '../components/dashboard/SubscriptionRow';
 import ContentCard from '../components/dashboard/ContentCard';
 import NotificationBell from '../components/dashboard/NotificationBell';
+import MobileSidebar from '../components/MobileSidebar';
 
 // Type definitions (minimal/shared)
 type Channel = { tutorId: string; name: string };
@@ -34,6 +35,7 @@ const Home: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Search & Voice
   const [searchQuery, setSearchQuery] = useState('');
@@ -274,18 +276,26 @@ const Home: React.FC = () => {
       <main className="flex-1 flex flex-col min-w-0">
 
         {/* Top Header */}
-        <header className="h-20 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-gray-100 px-6 flex items-center justify-between">
+        <header className="h-20 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-gray-100 px-4 md:px-6 flex items-center justify-between gap-4">
+
+          {/* Mobile Menu Toggle */}
+          <button
+            className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+            onClick={() => setIsMobileMenuOpen(true)}
+          >
+            <i className="fas fa-bars text-xl"></i>
+          </button>
 
           {/* Search Bar */}
           <div className="flex-1 max-w-2xl relative">
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <i className="fas fa-search text-gray-400 group-focus-within:text-blue-500 transition-colors"></i>
+                <i className="fas fa-search text-gray-400 group-focus-within:text-blue-500 transition-colors hidden md:block"></i>
               </div>
               <input
                 type="text"
-                className="w-full pl-11 pr-12 py-3 bg-gray-50 border-none rounded-2xl text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-100 focus:bg-white transition-all shadow-sm"
-                placeholder="What do you want to learn today?"
+                className="w-full pl-4 md:pl-11 pr-12 py-3 bg-gray-50 border-none rounded-2xl text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-100 focus:bg-white transition-all shadow-sm text-sm"
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
               />
@@ -484,6 +494,19 @@ const Home: React.FC = () => {
           </section>
         </div>
       </main>
+      <MobileSidebar
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        user={currentUser}
+        links={[
+          { icon: 'fa-home', label: 'Dashboard', path: '/home', active: true },
+          { icon: 'fa-compass', label: 'Explore', path: '/channels' },
+          { icon: 'fa-play-circle', label: 'Subscriptions', path: '/subscriptions' },
+          { icon: 'fa-book-open', label: 'My Learning', path: '/library' },
+          { icon: 'fa-users', label: 'Community', path: '/community' },
+          { icon: 'fa-robot', label: 'AI Buddy', path: '/buddy' },
+        ]}
+      />
     </div>
   );
 };

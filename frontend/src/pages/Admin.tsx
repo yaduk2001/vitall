@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logoImage from '../assets/logo.jpg';
+import MobileSidebar from '../components/MobileSidebar';
 
 // Types
 interface User {
@@ -54,6 +55,7 @@ const Admin: React.FC = () => {
   const [targetRoles, setTargetRoles] = useState<string[]>([]);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Custom Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -477,10 +479,18 @@ const Admin: React.FC = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-20 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-gray-100 px-8 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-800">
-            {activeTab === 'dashboard' ? 'Overview' : activeTab === 'content' ? 'Content Management' : activeTab === 'users' ? 'User Management' : activeTab === 'settings' ? 'Admin Settings' : 'Verification Requests'}
-          </h1>
+        <header className="h-20 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-gray-100 px-4 md:px-8 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              onClick={() => setIsMobileMenuOpen(true)}
+            >
+              <i className="fas fa-bars text-xl"></i>
+            </button>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-800 truncate">
+              {activeTab === 'dashboard' ? 'Overview' : activeTab === 'content' ? 'Content' : activeTab === 'users' ? 'Users' : activeTab === 'settings' ? 'Settings' : 'Requests'}
+            </h1>
+          </div>
           <div className="flex items-center gap-4">
             <button
               onClick={() => setShowBroadcastModal(true)}
@@ -1089,8 +1099,19 @@ const Admin: React.FC = () => {
           </div>
         </div>
       )}
+      <MobileSidebar
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        title={<span className="text-xl font-bold text-blue-600">Vital Admin</span>}
+        links={[
+          { icon: 'fa-chart-line', label: 'Dashboard', onClick: () => setActiveTab('dashboard'), active: activeTab === 'dashboard' },
+          { icon: 'fa-video', label: 'Content', onClick: () => setActiveTab('content'), active: activeTab === 'content' },
+          { icon: 'fa-users', label: 'All Users', onClick: () => setActiveTab('users'), active: activeTab === 'users' },
+          { icon: 'fa-clipboard-check', label: 'Requests', onClick: () => setActiveTab('requests'), active: activeTab === 'requests' },
+          { icon: 'fa-cog', label: 'Settings', onClick: () => setActiveTab('settings'), active: activeTab === 'settings' },
+        ]}
+      />
     </div>
-
   );
 };
 

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import ProfileMenu from '../components/ProfileMenu';
+import Toast from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 
 interface Module {
   title: string;
@@ -25,6 +27,7 @@ const EditUploadsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const { toasts, removeToast, showSuccess, showError, showWarning, showInfo } = useToast();
 
   // Edit State
   const [editTitle, setEditTitle] = useState('');
@@ -86,13 +89,13 @@ const EditUploadsPage: React.FC = () => {
             : c
         ));
         setEditingId(null);
-        alert('Course updated successfully');
+        showSuccess('Course updated successfully');
       } else {
-        alert('Failed to update course');
+        showError('Failed to update course');
       }
     } catch (e) {
       console.error('Update failed', e);
-      alert('Error updating course');
+      showError('Error updating course');
     }
   };
 
@@ -103,9 +106,9 @@ const EditUploadsPage: React.FC = () => {
       // Implement delete API call if available, for now just UI remove
       // const res = await fetch(`${BASE_URL}/api/courses/${id}`, { method: 'DELETE' });
       // if (res.ok) ...
-      alert('Delete functionality to be implemented in API');
+      showWarning('Delete functionality to be implemented in API');
     } catch (e) {
-      alert('Delete failed');
+      showError('Delete failed');
     }
   };
 
@@ -367,6 +370,18 @@ const EditUploadsPage: React.FC = () => {
 
           </div>
         </div>
+      </div>
+
+      {/* Toast Notifications */}
+      <div className="fixed top-6 right-6 z-[100] space-y-3">
+        {toasts.map(toast => (
+          <Toast
+            key={toast.id}
+            message={toast.message}
+            type={toast.type}
+            onClose={() => removeToast(toast.id)}
+          />
+        ))}
       </div>
     </div>
   );

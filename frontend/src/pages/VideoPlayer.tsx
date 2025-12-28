@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import logoImage from '../assets/logo.jpg';
+import Toast from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 
 interface Module {
   title: string;
@@ -53,6 +55,14 @@ const VideoPlayer: React.FC = () => {
   // Get module parameter from URL for continue watching
   const urlParams = new URLSearchParams(window.location.search);
   const moduleParam = urlParams.get('module');
+  const referrer = urlParams.get('ref'); // Get referrer parameter
+
+  // Determine back URL based on referrer and user role
+  const getBackUrl = () => {
+    if (referrer === 'creator') return '/CreatorDashboard';
+    if (currentUser?.role === 'content_creator') return '/CreatorDashboard';
+    return '/home'; // Default to home for students
+  };
 
   // Header state variables
   const [hasSpeech, setHasSpeech] = useState<boolean>(false);
@@ -83,6 +93,7 @@ const VideoPlayer: React.FC = () => {
   const searchRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
   const listeningRef = useRef<boolean>(false);
+  const { toasts, removeToast, showSuccess, showError, showWarning, showInfo } = useToast();
 
   const BASE_URL = useMemo(() => (import.meta as any).env.PUBLIC_BACKEND_URL || 'http://localhost:5000', []);
 
@@ -347,7 +358,7 @@ const VideoPlayer: React.FC = () => {
 
           // Show completion message
           setTimeout(() => {
-            alert('Module completed! 🎉');
+            showSuccess('Module completed! 🎉');
           }, 500);
         } else if (progressPercent < 90 && completedModules.includes(moduleIdx)) {
           // If progress dropped below 90%, remove from completed
@@ -385,7 +396,7 @@ const VideoPlayer: React.FC = () => {
     // Check if module is unlocked
     const canAccess = moduleIdx === 0 || completedModules.includes(moduleIdx - 1);
     if (!canAccess) {
-      alert(`Please complete Module ${moduleIdx} first before accessing this module.`);
+      showWarning(`Please complete Module ${moduleIdx} first before accessing this module.`);
       return;
     }
 
@@ -592,14 +603,14 @@ const VideoPlayer: React.FC = () => {
         const data = await res.json();
         setComments(prev => [data.comment, ...prev]);
         setNewComment('');
-        alert('Comment posted successfully!');
+        showSuccess('Comment posted successfully!');
       } else {
         const errorData = await res.json();
-        alert(`Failed to post comment: ${errorData.error}`);
+        showError(`Failed to post comment: ${errorData.error}`);
       }
     } catch (error) {
       console.error('Error submitting comment:', error);
-      alert('Failed to post comment. Please try again.');
+      showError('Failed to post comment. Please try again.');
     } finally {
       setSubmittingComment(false);
     }
@@ -633,7 +644,7 @@ const VideoPlayer: React.FC = () => {
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl);
-      alert('Link copied to clipboard!');
+      showInfo('Link copied to clipboard!');
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
       // Fallback for older browsers
@@ -643,7 +654,7 @@ const VideoPlayer: React.FC = () => {
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);
-      alert('Link copied to clipboard!');
+      showInfo('Link copied to clipboard!');
     }
   };
 
@@ -781,7 +792,7 @@ const VideoPlayer: React.FC = () => {
 
   function toggleVoice() {
     const rec = recognitionRef.current;
-    if (!rec) return alert('Speech recognition is not supported in this browser.');
+    if (!rec) return showWarning('Speech recognition is not supported in this browser.');
     try {
       if (listeningRef.current) rec.stop(); else rec.start();
     } catch { }
@@ -834,7 +845,7 @@ const VideoPlayer: React.FC = () => {
       {/* Main Header - copied from Home.tsx */}
       <header className="header">
         <div className="header-left">
-          <a className="logo" href="/">
+          <a className="logo" href={getBackUrl()}>
             <img src={logoImage} alt="Logo" className="logo-image" />
           </a>
         </div>

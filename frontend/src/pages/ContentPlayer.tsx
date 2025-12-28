@@ -1,15 +1,31 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import ProfileMenu from '../components/ProfileMenu';
+import { useToast } from '../hooks/useToast';
 
 const ContentPlayer: React.FC = () => {
     const { id } = useParams<{ id: string }>();
+    const { showSuccess, showError } = useToast();
     const [content, setContent] = useState<any>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const audioRef = useRef<HTMLAudioElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [currentUser, setCurrentUser] = useState<any>(null);
+    const [comments, setComments] = useState<any[]>([]);
+    const [commentText, setCommentText] = useState('');
+    const [isPostingComment, setIsPostingComment] = useState(false);
+
+    // Get referrer parameter from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const referrer = urlParams.get('ref');
+
+    // Determine back URL based on referrer and user role
+    const getBackUrl = () => {
+        if (referrer === 'creator') return '/CreatorDashboard';
+        if (currentUser?.role === 'content_creator') return '/CreatorDashboard';
+        return '/home'; // Default to home for students
+    };
 
     // Check auth status
     useEffect(() => {
@@ -35,12 +51,108 @@ const ContentPlayer: React.FC = () => {
                 if (!res.ok) throw new Error('Failed to load content');
                 const data = await res.json();
                 setContent(data);
+
+                // Fetch comments
+                const resComments = await fetch(`${BASE_URL}/api/comments/content/${id}`);
+                if (resComments.ok) {
+                    const dataComments = await resComments.json();
+                    setComments(dataComments.comments || []);
+                }
             } catch (err) {
                 console.error(err);
             }
         }
         fetchContent();
     }, [id]);
+
+    const handlePostComment = async () => {
+        if (!commentText.trim() || !isAuthenticated) return;
+        setIsPostingComment(true);
+        try {
+            const BASE_URL = (import.meta as any).env.PUBLIC_BACKEND_URL || 'http://localhost:5000';
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${BASE_URL}/api/comments/content/${id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ content: commentText })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setComments([data.comment, ...comments]);
+                setCommentText('');
+            }
+        } catch (err) {
+            console.error('Failed to post comment', err);
+        } finally {
+            setIsPostingComment(false);
+        }
+    };
+
+    const handleLikeComment = async (commentId: string) => {
+        if (!isAuthenticated) return;
+        try {
+            const BASE_URL = (import.meta as any).env.PUBLIC_BACKEND_URL || 'http://localhost:5000';
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${BASE_URL}/api/comments/${commentId}/like`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setComments(comments.map(c => {
+                    if (c.id === commentId) {
+                        return {
+                            ...c,
+                            likeCount: data.likes,
+                            likes: data.isLiked ? [...(c.likes || []), currentUser.id] : (c.likes || []).filter((uid: string) => uid !== currentUser.id)
+                        };
+                    }
+                    return c;
+                }));
+            }
+        } catch (err) {
+            console.error('Failed to like comment', err);
+        }
+    };
+
+    const handleContentLike = async () => {
+        if (!isAuthenticated) return showError('Please login to like');
+        try {
+            const BASE_URL = (import.meta as any).env.PUBLIC_BACKEND_URL || 'http://localhost:5000';
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${BASE_URL}/api/content/${id}/like`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setContent((prev: any) => ({
+                    ...prev,
+                    likeCount: data.likes,
+                    likes: data.isLiked ? [...(prev.likes || []), currentUser.id] : (prev.likes || []).filter((uid: string) => uid !== currentUser.id)
+                }));
+            }
+        } catch (err) {
+            console.error('Failed to like content', err);
+            showError('Failed to like video');
+        }
+    };
+
+    const handleShare = () => {
+        const url = window.location.href;
+        navigator.clipboard.writeText(url);
+        showSuccess('Link copied to clipboard!');
+    };
 
     if (!content) return <div className="min-h-screen flex items-center justify-center text-white bg-black">Loading...</div>;
 
@@ -52,7 +164,7 @@ const ContentPlayer: React.FC = () => {
             {/* Navbar - Simplified for Theater Mode */}
             <div className="h-16 flex items-center justify-between px-6 bg-[#0f0f0f] border-b border-gray-800 sticky top-0 z-50">
                 <div className="flex items-center space-x-4">
-                    <a href="/home" className="text-gray-400 hover:text-white"><i className="fas fa-arrow-left"></i></a>
+                    <a href={getBackUrl()} className="text-gray-400 hover:text-white"><i className="fas fa-arrow-left"></i></a>
                     <span className="font-bold text-lg tracking-tight">Studio Player</span>
                 </div>
                 <div className="flex items-center space-x-6">
@@ -80,14 +192,38 @@ const ContentPlayer: React.FC = () => {
                                     </div>
                                     <h2 className="text-3xl font-bold mb-2 text-shadow-lg">{content.title}</h2>
                                     <p className="text-gray-300 font-medium">{meta.singer}</p>
-                                    <audio ref={audioRef} src={content.contentUrl} controls className="mt-8 w-96 max-w-full" autoPlay />
+                                    <audio
+                                        ref={audioRef}
+                                        src={(() => {
+                                            if (!content.contentUrl) return '';
+                                            if (content.contentUrl.startsWith('http')) return content.contentUrl;
+                                            const baseUrl = (import.meta as any).env.PUBLIC_BACKEND_URL || 'http://localhost:5000';
+                                            const path = content.contentUrl.startsWith('/') ? content.contentUrl : `/${content.contentUrl}`;
+                                            return `${baseUrl}${path}`;
+                                        })()}
+                                        controls
+                                        className="mt-8 w-96 max-w-full"
+                                        autoPlay
+                                    />
                                 </div>
                             </div>
                         ) : (
                             <video
                                 ref={videoRef}
-                                src={content.contentUrl}
-                                poster={content.thumbnailUrl}
+                                src={(() => {
+                                    if (!content.contentUrl) return '';
+                                    if (content.contentUrl.startsWith('http')) return content.contentUrl;
+                                    const baseUrl = (import.meta as any).env.PUBLIC_BACKEND_URL || 'http://localhost:5000';
+                                    const path = content.contentUrl.startsWith('/') ? content.contentUrl : `/${content.contentUrl}`;
+                                    return `${baseUrl}${path}`;
+                                })()}
+                                poster={(() => {
+                                    if (!content.thumbnailUrl) return '';
+                                    if (content.thumbnailUrl.startsWith('http')) return content.thumbnailUrl;
+                                    const baseUrl = (import.meta as any).env.PUBLIC_BACKEND_URL || 'http://localhost:5000';
+                                    const path = content.thumbnailUrl.startsWith('/') ? content.thumbnailUrl : `/${content.thumbnailUrl}`;
+                                    return `${baseUrl}${path}`;
+                                })()}
                                 controls
                                 autoPlay
                                 className="w-full h-full object-contain"
@@ -112,11 +248,20 @@ const ContentPlayer: React.FC = () => {
                     <div className="bg-[#1f1f1f] rounded-xl p-4 mt-4">
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex gap-2">
-                                <button className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full text-sm font-medium transition-colors">
+                                <button
+                                    onClick={handleContentLike}
+                                    className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${content.likes && Array.isArray(content.likes) && content.likes.includes(currentUser?.id)
+                                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                        : 'bg-white/10 hover:bg-white/20 text-white'
+                                        }`}
+                                >
                                     <i className="fas fa-thumbs-up"></i>
-                                    <span>{content.likes}</span>
+                                    <span>{content.likeCount !== undefined ? content.likeCount : (content.likes || 0)}</span>
                                 </button>
-                                <button className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full text-sm font-medium transition-colors">
+                                <button
+                                    onClick={handleShare}
+                                    className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full text-sm font-medium transition-colors"
+                                >
                                     <i className="fas fa-share"></i>
                                     <span>Share</span>
                                 </button>
@@ -127,61 +272,85 @@ const ContentPlayer: React.FC = () => {
 
                     {/* Comments Section */}
                     <div className="mt-6">
-                        <h3 className="text-xl font-bold mb-4">Comments <span className="text-gray-400 text-sm font-normal">(12)</span></h3>
+                        <h3 className="text-xl font-bold mb-4">Comments <span className="text-gray-400 text-sm font-normal">({comments.length})</span></h3>
 
                         {/* Add Comment Input */}
-                        <div className="flex gap-4 mb-6">
-                            <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center text-sm font-bold">
-                                ME
-                            </div>
-                            <div className="flex-1">
-                                <input
-                                    type="text"
-                                    placeholder="Add a comment..."
-                                    className="w-full bg-transparent border-b border-gray-700 focus:border-white outline-none pb-2 text-sm text-white transition-colors"
-                                />
-                                <div className="flex justify-end mt-2">
-                                    <button className="text-sm font-medium text-gray-400 hover:text-white mr-4">Cancel</button>
-                                    <button className="px-4 py-1.5 bg-gray-800 text-gray-400 rounded-full text-sm font-bold hover:bg-blue-600 hover:text-white transition-colors">Comment</button>
+                        {isAuthenticated ? (
+                            <div className="flex gap-4 mb-6">
+                                <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center text-sm font-bold overflow-hidden">
+                                    {currentUser.avatarUrl ? (
+                                        <img src={currentUser.avatarUrl.startsWith('http') ? currentUser.avatarUrl : `${(import.meta as any).env.PUBLIC_BACKEND_URL || 'http://localhost:5000'}/${currentUser.avatarUrl}`} className="w-full h-full object-cover" />
+                                    ) : (
+                                        currentUser.fullName ? currentUser.fullName.charAt(0).toUpperCase() : 'U'
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    <input
+                                        type="text"
+                                        placeholder="Add a comment..."
+                                        value={commentText}
+                                        onChange={(e) => setCommentText(e.target.value)}
+                                        className="w-full bg-transparent border-b border-gray-700 focus:border-white outline-none pb-2 text-sm text-white transition-colors"
+                                    />
+                                    <div className="flex justify-end mt-2">
+                                        <button
+                                            onClick={() => setCommentText('')}
+                                            className="text-sm font-medium text-gray-400 hover:text-white mr-4"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handlePostComment}
+                                            disabled={!commentText.trim() || isPostingComment}
+                                            className={`px-4 py-1.5 rounded-full text-sm font-bold transition-colors ${!commentText.trim() || isPostingComment ? 'bg-gray-800 text-gray-500' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                                        >
+                                            {isPostingComment ? 'Posting...' : 'Comment'}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="mb-6 p-4 bg-gray-800/50 rounded-lg text-center">
+                                <p className="text-sm text-gray-400">Please <a href="/login" className="text-blue-400 hover:underline">sign in</a> to post comments.</p>
+                            </div>
+                        )}
 
                         {/* Comment List */}
                         <div className="space-y-6">
-                            {/* Mock Comment 1 */}
-                            <div className="flex gap-4">
-                                <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold">JD</div>
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-bold">John Doe</span>
-                                        <span className="text-xs text-gray-500">2 days ago</span>
+                            {comments.length === 0 ? (
+                                <p className="text-gray-500 text-center py-4">No comments yet. Be the first to share your thoughts!</p>
+                            ) : (
+                                comments.map((comment) => (
+                                    <div key={comment.id} className="flex gap-4">
+                                        <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold overflow-hidden shrink-0">
+                                            {comment.user?.avatarUrl ? (
+                                                <img src={comment.user.avatarUrl.startsWith('http') ? comment.user.avatarUrl : `${(import.meta as any).env.PUBLIC_BACKEND_URL || 'http://localhost:5000'}/${comment.user.avatarUrl}`} className="w-full h-full object-cover" />
+                                            ) : (
+                                                comment.user?.fullName ? comment.user.fullName.charAt(0).toUpperCase() : '?'
+                                            )}
+                                        </div>
+                                        <div className="space-y-1 flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold">{comment.user?.fullName || 'Unknown User'}</span>
+                                                <span className="text-xs text-gray-500">{new Date(comment.createdAt).toLocaleDateString()}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-300">{comment.content}</p>
+                                            <div className="flex items-center gap-4 text-xs text-gray-400 mt-1">
+                                                <button
+                                                    onClick={() => handleLikeComment(comment.id)}
+                                                    className={`flex items-center gap-1 hover:text-white transition-colors ${comment.likes?.includes(currentUser?.id) ? 'text-blue-400' : ''}`}
+                                                >
+                                                    <i className={`fas fa-thumbs-up ${comment.likes?.includes(currentUser?.id) ? '' : 'text-gray-500'}`}></i>
+                                                    <span>{comment.likeCount || 0}</span>
+                                                </button>
+                                                {/* Dislike/Reply buttons can be added later if API supports it */}
+                                                {/* <button className="hover:text-white"><i className="fas fa-thumbs-down"></i></button> */}
+                                                {/* <button className="hover:text-white font-medium">Reply</button> */}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <p className="text-sm text-gray-300">This is exactly the vibe I was looking for! Amazing composition. 🔥</p>
-                                    <div className="flex items-center gap-4 text-xs text-gray-400 mt-1">
-                                        <button className="hover:text-white"><i className="fas fa-thumbs-up mr-1"></i> 24</button>
-                                        <button className="hover:text-white"><i className="fas fa-thumbs-down"></i></button>
-                                        <button className="hover:text-white font-medium">Reply</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Mock Comment 2 */}
-                            <div className="flex gap-4">
-                                <div className="w-10 h-10 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center text-xs font-bold">AS</div>
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-bold">Alice Smith</span>
-                                        <span className="text-xs text-gray-500">5 hours ago</span>
-                                    </div>
-                                    <p className="text-sm text-gray-300">Can't wait for the full album to drop. Great work on the vocals!</p>
-                                    <div className="flex items-center gap-4 text-xs text-gray-400 mt-1">
-                                        <button className="hover:text-white"><i className="fas fa-thumbs-up mr-1"></i> 8</button>
-                                        <button className="hover:text-white"><i className="fas fa-thumbs-down"></i></button>
-                                        <button className="hover:text-white font-medium">Reply</button>
-                                    </div>
-                                </div>
-                            </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 </div>

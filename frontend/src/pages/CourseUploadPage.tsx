@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import ProfileMenu from '../components/ProfileMenu';
 import ModuleUploadCard from '../components/upload/ModuleUploadCard';
 import TrainingModal from '../components/upload/TrainingModal';
+import Toast from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 
 interface Module {
   id: number;
@@ -29,6 +31,9 @@ const CourseUploadPage: React.FC = () => {
   const [isPaid, setIsPaid] = useState<boolean>(false);
   const [price, setPrice] = useState<string>('');
 
+  // Toast notifications
+  const { toasts, removeToast, showSuccess, showError, showWarning, showInfo } = useToast();
+
   useEffect(() => {
     // Check if user is logged in and is an organization
     const userJson = localStorage.getItem('user');
@@ -38,19 +43,19 @@ const CourseUploadPage: React.FC = () => {
     } catch { }
 
     if (!currentUser) {
-      alert('Please login to upload courses');
+      showError('Please login to upload courses');
       window.location.href = '/login';
       return;
     }
 
     if (currentUser.role !== 'organization') {
-      alert('Only organizations can upload courses. Please register as an organization.');
+      showError('Only organizations can upload courses. Please register as an organization.');
       window.location.href = '/register';
       return;
     }
 
     if (!currentUser.isApproved) {
-      alert('Your organization account is pending admin approval. Please wait for approval before uploading courses.');
+      showWarning('Your organization account is pending admin approval. Please wait for approval before uploading courses.');
       window.location.href = '/';
       return;
     }
@@ -117,7 +122,7 @@ const CourseUploadPage: React.FC = () => {
     const description = (descRef.current?.value || '').trim();
 
     if (!title) {
-      alert('Please enter a course name');
+      showError('Please enter a course name');
       return;
     }
 
@@ -126,7 +131,7 @@ const CourseUploadPage: React.FC = () => {
       ((m.type === 'video' || m.type === 'audio') && !m.video) || (m.type === 'document' && !m.document)
     );
     if (modulesWithoutContent.length > 0) {
-      alert(`Please upload content for all modules. Missing content for: ${modulesWithoutContent.map(m => m.title).join(', ')}`);
+      showError(`Please upload content for all modules. Missing content for: ${modulesWithoutContent.map(m => m.title).join(', ')}`);
       return;
     }
 
@@ -155,7 +160,7 @@ const CourseUploadPage: React.FC = () => {
           console.log('Thumbnail uploaded successfully:', thumbnailUrl);
         } else {
           console.error('Failed to upload thumbnail:', await tres.text());
-          alert('Failed to upload thumbnail. Please try again.');
+          showError('Failed to upload thumbnail. Please try again.');
           return;
         }
       }
@@ -197,7 +202,7 @@ const CourseUploadPage: React.FC = () => {
             });
           } else {
             console.error(`Failed to upload ${m.type} for module ${m.title}:`, await r.text());
-            alert(`Failed to upload ${m.type} for module: ${m.title}`);
+            showError(`Failed to upload ${m.type} for module: ${m.title}`);
             return;
           }
         } else if (m.type === 'document' && m.document) {
@@ -242,7 +247,7 @@ const CourseUploadPage: React.FC = () => {
             console.error(`Failed to upload document for module ${m.title}:`, errorText);
             console.error('Response status:', r.status);
             console.error('Response headers:', r.headers);
-            alert(`Failed to upload document for module: ${m.title}. Error: ${errorText}`);
+            showError(`Failed to upload document for module: ${m.title}. Error: ${errorText}`);
             return;
           }
         }
@@ -285,7 +290,7 @@ const CourseUploadPage: React.FC = () => {
       console.log('Course ID:', courseData.course?.id);
       console.log('Modules in created course:', courseData.course?.modules?.length);
 
-      alert('Course created successfully!');
+      showSuccess('Course created successfully!');
       // window.location.href = '/channel';
 
       setShowSuccessModal(true);
@@ -310,7 +315,7 @@ const CourseUploadPage: React.FC = () => {
         setProgressValue(progress);
       }, 50); // 50ms * 50 steps = 2.5 seconds total duration
     } catch (e: any) {
-      alert(`Failed to upload: ${e?.message || e}`);
+      showError(`Failed to upload: ${e?.message || e}`);
     }
   }
 
@@ -572,6 +577,18 @@ const CourseUploadPage: React.FC = () => {
           onViewPage={() => window.location.href = '/channel'}
         />
       )}
+
+      {/* Toast Notifications */}
+      <div className="fixed top-6 right-6 z-[100] space-y-3">
+        {toasts.map(toast => (
+          <Toast
+            key={toast.id}
+            message={toast.message}
+            type={toast.type}
+            onClose={() => removeToast(toast.id)}
+          />
+        ))}
+      </div>
     </div >
   );
 };

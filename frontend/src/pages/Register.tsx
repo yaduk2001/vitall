@@ -396,6 +396,20 @@ const Register: React.FC = () => {
         }
       }
 
+      @media (max-width: 768px) {
+        .auth-container {
+          grid-template-columns: 1fr;
+          margin: 1rem;
+          min-height: auto;
+        }
+        .left-panel {
+          display: none;
+        }
+        .right-panel {
+          padding: 2rem;
+        }
+      }
+
       .auth-container::after {
         content: '';
         position: absolute;

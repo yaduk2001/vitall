@@ -34,6 +34,7 @@ connectDB();
 // CORS Configuration - Allow frontend origins
 const allowedOrigins = [
   ...(process.env.CORS_ALLOWED_ORIGINS ? process.env.CORS_ALLOWED_ORIGINS.split(',') : []),
+  'http://localhost:5173',
   FRONTEND_URL,
   FRONTEND_URL_PROD
 ].filter((url, index, arr) => url && arr.indexOf(url) === index); // Remove duplicates and empty strings
@@ -136,6 +137,7 @@ app.get('/api/files/:id/:type', async (req, res) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/content', require('./routes/content'));
+app.use('/api/comments', require('./routes/comments'));
 
 // Channels
 app.post('/api/channels', async (req, res) => {
