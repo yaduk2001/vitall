@@ -462,7 +462,10 @@ const ChannelsList: React.FC = () => {
                 </div>
                 <h1 className="text-3xl md:text-4xl font-bold mb-2">Explore Channels</h1>
                 <p className="text-indigo-100 max-w-xl text-lg opacity-90">
-                  Connect with expert tutors and master new skills across technology, science, and creative arts.
+                  {currentUser ?
+                    `Welcome back, ${currentUser.name || 'Creator'}! Discover new content.` :
+                    "Welcome Guest! content related for Creators are visible for you, Login to get more features."
+                  }
                 </p>
               </div>
 

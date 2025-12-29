@@ -1,10 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import logoImage from '../assets/logo.jpg';
 
 const LandingPage: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const navigate = useNavigate();
+
+  const handleBrowseClick = (e: React.MouseEvent) => {
+    // Guest browsing allowed: Navigate to UserDashboard
+    navigate('/userhome');
+  };
 
   useEffect(() => {
     setIsVisible(true);
@@ -115,8 +121,8 @@ const LandingPage: React.FC = () => {
             <span className="logo-text">SUPE AI</span>
           </Link>
           <div className="nav-links">
-            <Link to="/home" className="nav-link">Browse Courses</Link>
-            <Link to="/channels" className="nav-link">Channels</Link>
+            <Link to="/home" className="nav-link" onClick={handleBrowseClick}>Browse Courses</Link>
+            <Link to="/userhome" className="nav-link">Channels</Link>
             <Link to="/login" className="nav-link secondary">Sign In</Link>
             <Link to="/register" className="nav-link primary">Get Started</Link>
           </div>
@@ -146,7 +152,7 @@ const LandingPage: React.FC = () => {
                 <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </Link>
-            <Link to="/channels" className="cta-button secondary-btn">
+            <Link to="/userhome" className="cta-button secondary-btn">
               Explore Channels
             </Link>
           </div>
@@ -220,7 +226,7 @@ const LandingPage: React.FC = () => {
             <Link to="/register" className="cta-button primary-btn large">
               Create Free Account
             </Link>
-            <Link to="/home" className="cta-button secondary-btn large">
+            <Link to="/home" className="cta-button secondary-btn large" onClick={handleBrowseClick}>
               Browse Courses
             </Link>
           </div>
@@ -235,7 +241,7 @@ const LandingPage: React.FC = () => {
             <span className="footer-text">SUPE AI</span>
           </div>
           <div className="footer-links">
-            <Link to="/home" className="footer-link">Courses</Link>
+            <Link to="/home" className="footer-link" onClick={handleBrowseClick}>Courses</Link>
             <Link to="/channels" className="footer-link">Channels</Link>
             <Link to="/login" className="footer-link">Sign In</Link>
             <Link to="/register" className="footer-link">Register</Link>
@@ -635,7 +641,7 @@ const LandingPage: React.FC = () => {
           z-index: 10;
           max-width: 1200px;
           margin: 0 auto;
-          padding: 100px 32px;
+          padding: 60px 32px;
           opacity: 0;
           transform: translateY(30px);
           transition: all 0.8s ease 0.4s;
@@ -742,7 +748,7 @@ const LandingPage: React.FC = () => {
         .cta-section {
           position: relative;
           z-index: 10;
-          padding: 100px 32px;
+          padding: 60px 32px;
           background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
           opacity: 0;
           transform: translateY(30px);
@@ -867,11 +873,13 @@ const LandingPage: React.FC = () => {
           .hero-section {
             grid-template-columns: 1fr;
             text-align: center;
+            padding-top: 40px;
           }
 
           .hero-visual {
             height: 300px;
             margin-top: 40px;
+            display: none; /* Hide floating cards on tablets/mobile to reduce clutter */
           }
 
           .features-grid {
@@ -884,67 +892,67 @@ const LandingPage: React.FC = () => {
         }
 
         @media (max-width: 768px) {
-          .nav-links {
-            gap: 12px;
-          }
-
-          .nav-link {
-            font-size: 14px;
-            padding: 6px 12px;
+          .nav-container {
+             padding: 0 20px;
           }
 
           .hero-title {
-            font-size: 36px;
+            font-size: 40px;
           }
 
           .hero-description {
             font-size: 16px;
+            margin: 0 auto;
           }
 
           .hero-cta {
-            flex-direction: column;
+            justify-content: center;
           }
-
-          .features-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .stats-container {
-            grid-template-columns: repeat(2, 1fr);
-          }
-
-          .cta-title {
-            font-size: 32px;
-          }
-
-          .footer-container {
-            flex-direction: column;
-            text-align: center;
+          
+          .cta-buttons {
+             flex-direction: column;
+             gap: 16px;
           }
         }
 
         @media (max-width: 640px) {
-          .nav-container {
-            padding: 0 16px;
-          }
-
           .nav-links {
-            display: none;
+             gap: 8px;
+          }
+          
+          /* Hide text links on mobile, keep buttons */
+          .nav-link:not(.primary):not(.secondary) {
+             display: none;
+          }
+          
+          .nav-link.primary, .nav-link.secondary {
+             padding: 8px 14px;
+             font-size: 13px;
           }
 
           .hero-section {
-            padding: 60px 16px;
+            padding: 40px 16px;
           }
-
-          .stats-section,
-          .features-section,
-          .cta-section {
-            padding-left: 16px;
-            padding-right: 16px;
+          
+          .hero-title {
+             font-size: 34px;
           }
 
           .stats-container {
             grid-template-columns: 1fr;
+          }
+          
+          .features-grid {
+             grid-template-columns: 1fr;
+          }
+          
+          .footer-container {
+             flex-direction: column;
+             text-align: center;
+          }
+          
+          .footer-links {
+             justify-content: center;
           }
         }
       `}</style>

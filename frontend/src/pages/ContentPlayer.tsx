@@ -250,9 +250,12 @@ const ContentPlayer: React.FC = () => {
                             <div className="flex gap-2">
                                 <button
                                     onClick={handleContentLike}
-                                    className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${content.likes && Array.isArray(content.likes) && content.likes.includes(currentUser?.id)
-                                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                        : 'bg-white/10 hover:bg-white/20 text-white'
+                                    disabled={!isAuthenticated}
+                                    className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${!isAuthenticated
+                                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-50'
+                                        : content.likes && Array.isArray(content.likes) && content.likes.includes(currentUser?.id)
+                                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                            : 'bg-white/10 hover:bg-white/20 text-white'
                                         }`}
                                 >
                                     <i className="fas fa-thumbs-up"></i>
@@ -431,7 +434,7 @@ const ContentPlayer: React.FC = () => {
 
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 
