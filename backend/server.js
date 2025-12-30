@@ -777,9 +777,14 @@ app.post('/api/videos', async (req, res) => {
           videoUrl,
           thumbnailData,
           videoData,
-          thumbnailMimeType,
           videoMimeType
         });
+
+        // Use persistent API URLs instead of ephemeral file paths
+        doc.thumbnailUrl = `/api/files/${doc._id}/thumbnail`;
+        doc.videoUrl = `/api/files/${doc._id}/video`;
+        // Also set resourceUrl if it exists (though we don't have a DB endpoint for it yet, keep as is or update if we added one)
+
         const saved = await doc.save();
 
         // Create notifications for all subscribers if tutorId is provided
