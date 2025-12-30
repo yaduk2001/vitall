@@ -1,394 +1,594 @@
-import React, { useEffect, useRef, useState } from 'react';
-import ProfileMenu from '../components/ProfileMenu';
-import TrainingModal from '../components/upload/TrainingModal';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useToast, ToastItem } from '../hooks/useToast';
 import Toast from '../components/Toast';
-import { useToast } from '../hooks/useToast';
+import ProfileMenu from '../components/ProfileMenu';
+import MobileSidebar from '../components/MobileSidebar'; // Assuming this component exists as used in CreatorDashboard
 
-const ContentUploadPage: React.FC = () => {
-    // Refs
-    const thumbRef = useRef<HTMLInputElement>(null);
-    const contentRef = useRef<HTMLInputElement>(null);
-    const [title, setTitle] = useState('');
-    const descRef = useRef<HTMLTextAreaElement>(null);
-
-    // Music Metadata Refs
-    const singerRef = useRef<HTMLInputElement>(null);
-    const composerRef = useRef<HTMLInputElement>(null);
-    const castRef = useRef<HTMLInputElement>(null);
-
-    // State
-    const [user, setUser] = useState<any>(null);
-    const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+const ContentUploadPage = () => {
+    const navigate = useNavigate();
+    const [activeTab, setActiveTab] = useState<'video' | 'details' | 'preview'>('video');
+    const [dragActive, setDragActive] = useState(false);
     const [contentFile, setContentFile] = useState<File | null>(null);
-    const [contentType, setContentType] = useState<'video' | 'audio'>('video');
-    const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
-    const [trainingStep, setTrainingStep] = useState<number>(0);
-    const [trainingPhase, setTrainingPhase] = useState<'progress' | 'graph'>('progress');
-    const [progressValue, setProgressValue] = useState<number>(0);
+    const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+    const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [videoQuality, setVideoQuality] = useState('1080p');
     const [isUploading, setIsUploading] = useState(false);
-    const [uploadedContentId, setUploadedContentId] = useState<string>('');
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [uploadedContentId, setUploadedContentId] = useState<string | null>(null);
+    const [user, setUser] = useState<any>(null);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-    // Toast notifications
-    const { toasts, removeToast, showSuccess, showError, showWarning, showInfo } = useToast();
+    const hiddenVideoRef = useRef<HTMLVideoElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const thumbnailInputRef = useRef<HTMLInputElement>(null);
+    const { toasts, showSuccess, showError, removeToast } = useToast();
 
-    // Wizard State
-    const [step, setStep] = useState(1); // 1: Details, 2: Video Element, 3: Checks, 4: Visibility
+    // Use environment variable for backend URL
+    const BASE_URL = (import.meta as any).env.PUBLIC_BACKEND_URL || 'http://localhost:5000';
 
     useEffect(() => {
-        const userJson = localStorage.getItem('user');
-        let currentUser: any = null;
-        try { currentUser = userJson ? JSON.parse(userJson) : null; } catch { }
-        if (!currentUser) { window.location.href = '/login'; return; }
-        setUser(currentUser);
-    }, []);
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            setUser(JSON.parse(storedUser));
+        } else {
+            console.warn('No user found, redirecting to login');
+            navigate('/login');
+        }
+    }, [navigate]);
 
-    const handleThumbnailUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (ev) => setThumbnailPreview(ev.target?.result as string);
-            reader.readAsDataURL(file);
+    const handleDrag = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === "dragenter" || e.type === "dragover") {
+            setDragActive(true);
+        } else if (e.type === "dragleave") {
+            setDragActive(false);
         }
     };
 
-    const handleContentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleFileSelect(e.dataTransfer.files[0]);
+        }
+    };
+
+    const handleFileSelect = (file: File) => {
+        if (file.type.startsWith('video/') || file.type.startsWith('audio/')) {
             setContentFile(file);
-            // Auto-fill title if empty
             if (!title) {
+                // Remove extension for default title
                 setTitle(file.name.replace(/\.[^/.]+$/, ""));
             }
+
+            // Auto-detect quality if it's a video
+            if (file.type.startsWith('video/') && hiddenVideoRef.current) {
+                const url = URL.createObjectURL(file);
+                hiddenVideoRef.current.src = url;
+            } else {
+                setVideoQuality('Audio'); // Set default for audio
+            }
+
+            setActiveTab('details');
+            showSuccess('File added successfully');
+        } else {
+            showError('Please select a valid video or audio file');
         }
     };
 
-    async function onPublish() {
-        if (isUploading) return;
-        const BASE_URL = (import.meta as any).env.PUBLIC_BACKEND_URL || 'http://localhost:5000';
-        const currentTitle = title.trim();
-        const description = (descRef.current?.value || '').trim();
+    const handleThumbnailSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setThumbnailFile(file);
+            const previewUrl = URL.createObjectURL(file);
+            setThumbnailPreview(previewUrl);
+        }
+    };
 
-        if (!currentTitle) { showError('Please enter a title'); return; }
-        if (!contentFile) { showError('Please upload content'); return; }
+    const onPublish = async () => {
+        if (!title.trim()) {
+            showError('Please enter a title');
+            setActiveTab('details');
+            return;
+        }
+        if (!contentFile) {
+            showError('Please select a video file');
+            setActiveTab('video');
+            return;
+        }
 
         setIsUploading(true);
+        setUploadProgress(0);
 
         try {
-            // 1. Upload Thumbnail
-            let thumbnailUrl = '';
-            const tf = thumbRef.current?.files?.[0];
-            if (tf) {
-                const thumbFd = new FormData();
-                thumbFd.append('title', `${currentTitle} - Thumbnail`);
-                thumbFd.append('thumbnail', tf);
-                const tres = await fetch(`${BASE_URL}/api/videos`, { method: 'POST', body: thumbFd });
-                if (tres.ok) {
-                    const tjson = await tres.json();
-                    thumbnailUrl = (tjson.video && tjson.video.thumbnailUrl) || '';
-                }
-            }
+            const formData = new FormData();
+            formData.append('video', contentFile);
+            formData.append('title', title); // Required by backend
+            formData.append('description', description);
+            if (thumbnailFile) formData.append('thumbnail', thumbnailFile);
 
-            // 2. Upload Content
-            const contentFd = new FormData();
-            contentFd.append('title', `${currentTitle} - Content`);
-            contentFd.append('video', contentFile);
-            const r = await fetch(`${BASE_URL}/api/videos`, { method: 'POST', body: contentFd });
-            if (!r.ok) throw new Error('Failed to upload content file');
-            const j = await r.json();
-            const contentUrl = j.video?.videoUrl || '';
+            // Simulate progress since fetch doesn't support built-in progress events easily
+            const progressInterval = setInterval(() => {
+                setUploadProgress(prev => {
+                    if (prev >= 90) {
+                        clearInterval(progressInterval);
+                        return 90;
+                    }
+                    return prev + 10;
+                });
+            }, 500);
 
-            // 3. Create Content Record
-            const metadata = {
-                singer: singerRef.current?.value || '',
-                composer: composerRef.current?.value || '',
-                cast: castRef.current?.value || '',
-            };
-
-            const contentPayload = {
-                title: currentTitle,
-                description,
-                type: contentType,
-                thumbnailUrl,
-                contentUrl,
-                metadata,
-                tags: [user.creatorType]
-            };
-
-            const token = localStorage.getItem('token');
-            const contentRes = await fetch(`${BASE_URL}/api/content`, {
+            // 1. Upload the file(s)
+            console.log(`Uploading to: ${BASE_URL}/api/videos`);
+            const uploadRes = await fetch(`${BASE_URL}/api/videos`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(contentPayload)
+                body: formData,
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem('token')}`
+                }
             });
 
-            if (!contentRes.ok) throw new Error('Failed to publish content');
+            clearInterval(progressInterval);
 
-            const contentData = await contentRes.json();
-            setUploadedContentId(contentData.content?._id || contentData.content?.id || '');
+            const uploadResText = await uploadRes.text();
+            let uploadData;
+            try {
+                uploadData = JSON.parse(uploadResText);
+            } catch (e) {
+                console.error('Failed to parse upload response:', uploadResText);
+                throw new Error(`Server returned invalid response: ${uploadResText.substring(0, 100)}...`);
+            }
 
+            if (!uploadRes.ok) {
+                throw new Error(uploadData.error || uploadData.message || 'Upload failed');
+            }
+
+            setUploadProgress(100);
+
+            // 2. Create the content record
+            const contentUrl = uploadData.video.videoUrl;
+            const uploadedThumbnailUrl = uploadData.video.thumbnailUrl;
+
+            const metadata = {
+                title,
+                description,
+                contentUrl,
+                thumbnailUrl: uploadedThumbnailUrl,
+                tags: [user?.creatorType || 'general'],
+                quality: videoQuality,
+                type: contentFile.type.startsWith('audio/') ? 'audio' : 'video' // Explicitly set type
+            };
+
+            const createRes = await fetch(`${BASE_URL}/api/content`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify(metadata)
+            });
+
+            const createResText = await createRes.text();
+            let createData;
+            try {
+                createData = JSON.parse(createResText);
+            } catch (e) {
+                console.error('Failed to parse create content response:', createResText);
+                throw new Error(`Server returned invalid response for content creation: ${createResText.substring(0, 100)}...`);
+            }
+
+            if (!createRes.ok) {
+                throw new Error(createData.message || 'Failed to create content record');
+            }
+            setUploadedContentId(createData.content._id);
+            showSuccess('Content published successfully!');
             setShowSuccessModal(true);
-            setTrainingPhase('progress');
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += 5;
-                if (progress >= 100) {
-                    progress = 100;
-                    clearInterval(interval);
-                    setTimeout(() => {
-                        setTrainingPhase('graph');
-                        setTimeout(() => setTrainingStep(1), 100);
-                        setTimeout(() => setTrainingStep(2), 1500);
-                    }, 500);
-                }
-                setProgressValue(progress);
-            }, 50);
 
-        } catch (e: any) {
-            showError(`Error: ${e.message}`);
+        } catch (error: any) {
+            console.error('Publish Error:', error);
+            showError(error.message || 'Something went wrong during upload');
+            setUploadProgress(0);
+        } finally {
             setIsUploading(false);
         }
-    }
+    };
 
-    const isMusic = user?.creatorType === 'music_company';
-
-    // Generate dynamic video link
-    const FRONTEND_URL = window.location.origin; // Gets current frontend URL
-    const videoLink = uploadedContentId ? `${FRONTEND_URL}/watch/${uploadedContentId}` : `${FRONTEND_URL}/watch/...`;
+    const getCreatorLabel = () => {
+        if (!user) return 'Creator';
+        const type = user.creatorType;
+        if (type === 'vlogger') return 'Vlogger';
+        if (type === 'music_company') return 'Music Company';
+        if (type === 'corporate') return 'Corporate';
+        if (type === 'medical') return 'Medical';
+        return 'Creator';
+    };
 
     return (
-        <div className="fixed inset-0 bg-gradient-to-br from-blue-600 via-white to-red-500 z-50 overflow-hidden flex flex-col font-sans text-gray-800">
-            {/* Header */}
-            <div className="h-14 border-b-4 border-red-500 backdrop-blur-xl bg-white/95 flex items-center justify-between px-6 shrink-0 z-20 shadow-lg">
-                <h1 className="text-xl font-bold truncate w-1/4 bg-gradient-to-r from-blue-600 to-red-600 bg-clip-text text-transparent">{title || 'Untitled content'}</h1>
-
-
-
-                <div className="w-1/4 flex justify-end">
-                    <button onClick={() => window.location.href = '/CreatorDashboard'} className="text-gray-500 hover:text-gray-700">
-                        <i className="fas fa-times text-xl"></i>
-                    </button>
-                </div>
-            </div>
-
-            {/* Main Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-6 md:p-8 relative">
-                <div className="max-w-6xl mx-auto h-full flex gap-8">
-
-                    {/* LEFT COLUMN: Inputs */}
-                    <div className="flex-1 pb-10">
-
-                        <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border-2 border-blue-200 p-6 md:p-8 space-y-8 relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 via-red-500 to-blue-600"></div>
-                            <div className="absolute -top-20 -right-20 w-40 h-40 bg-red-500/10 rounded-full blur-3xl"></div>
-                            <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-                                    <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-red-500 text-white flex items-center justify-center text-sm shadow-lg">
-                                        <i className="fas fa-pen-nib"></i>
-                                    </span>
-                                    Details
-                                </h2>
-                                <button className="bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-bold uppercase hover:from-blue-700 hover:to-blue-800 px-4 py-2 rounded-xl transition-all shadow-md hover:shadow-lg active:scale-95">
-                                    Reuse Details
-                                </button>
-                            </div>
-
-                            {/* Title (Floating Label Style) */}
-                            <div className="relative group">
-                                <div className="absolute left-4 top-5 text-blue-400 group-focus-within:text-red-500 transition-colors">
-                                    <i className="fas fa-heading"></i>
-                                </div>
-                                <input
-                                    type="text"
-                                    required
-                                    value={title}
-                                    onChange={(e) => setTitle(e.target.value)}
-                                    className="peer w-full h-14 pl-12 pr-4 pt-4 pb-1 rounded-xl border-2 border-blue-200 bg-white text-gray-900 focus:bg-white focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/20 transition-all placeholder-transparent font-medium shadow-sm"
-                                    placeholder="Title"
-                                />
-                                <label className="absolute left-12 top-1 text-[10px] uppercase font-bold text-blue-600 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:capitalize peer-placeholder-shown:font-medium peer-focus:top-1 peer-focus:text-[10px] peer-focus:font-bold peer-focus:text-red-600">
-                                    Title (required)
-                                </label>
-                                <p className="text-right text-xs text-gray-400 mt-2 font-medium">{title.length}/100</p>
-                            </div>
-
-                            {/* Description */}
-                            <div className="relative group">
-                                <div className="absolute left-4 top-6 text-blue-400 group-focus-within:text-red-500 transition-colors">
-                                    <i className="fas fa-align-left"></i>
-                                </div>
-                                <textarea
-                                    ref={descRef}
-                                    className="peer w-full h-40 pl-12 pr-4 pt-6 rounded-xl border-2 border-blue-200 bg-white text-gray-900 focus:bg-white focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/20 transition-all resize-none placeholder-transparent font-medium leading-relaxed shadow-sm"
-                                    placeholder="Description"
-                                ></textarea>
-                                <label className="absolute left-12 top-2 text-[10px] uppercase font-bold text-blue-600 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:capitalize peer-placeholder-shown:font-medium peer-focus:top-2 peer-focus:text-[10px] peer-focus:font-bold peer-focus:text-red-600">
-                                    Description
-                                </label>
-                                <p className="text-right text-xs text-gray-400 mt-2 font-medium">0/5000</p>
-                            </div>
-
-                            {/* Thumbnail Section */}
-                            <div className="space-y-2">
-                                <h3 className="font-bold text-gray-800 text-sm">Thumbnail</h3>
-                                <p className="text-xs text-gray-500 max-w-lg mb-4">Set a thumbnail that stands out and draws viewers' attention.</p>
-
-                                <div className="flex gap-6">
-                                    {/* Upload Box */}
-                                    <div
-                                        className="w-56 aspect-video border-3 border-dashed border-blue-400 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-red-500 hover:bg-gradient-to-br hover:from-blue-50 hover:to-red-50 transition-all duration-300 overflow-hidden relative group shadow-lg hover:shadow-2xl"
-                                        onClick={() => thumbRef.current?.click()}
-                                    >
-                                        {thumbnailPreview ? (
-                                            <div className="relative w-full h-full group-hover:opacity-90 transition-opacity">
-                                                <img src={thumbnailPreview} className="w-full h-full object-cover" />
-                                                <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <i className="fas fa-pen text-white text-xl drop-shadow-lg"></i>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-100 to-red-100 flex items-center justify-center mb-3 group-hover:from-blue-500 group-hover:to-red-500 group-hover:scale-110 transition-all duration-300 shadow-md">
-                                                    <i className="fas fa-image text-blue-500 text-2xl group-hover:text-white transition-colors"></i>
-                                                </div>
-                                                <span className="text-xs text-blue-600 group-hover:text-red-600 font-bold uppercase tracking-wide">Upload thumbnail</span>
-                                            </>
-                                        )}
-                                        <input ref={thumbRef} type="file" accept="image/*" className="hidden" onChange={handleThumbnailUpload} />
-                                    </div>
-
-                                    {/* Auto-generated blanks (Visual Only) */}
-                                    {[1, 2].map(i => (
-                                        <div key={i} className="w-56 aspect-video bg-gradient-to-br from-blue-50 to-white rounded-xl border-2 border-blue-100 flex items-center justify-center opacity-60 hover:opacity-100 transition-opacity cursor-not-allowed">
-                                            <i className="fas fa-magic text-blue-300"></i>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Playlist / Metadata / Audience */}
-                            <div className="space-y-6 pt-4">
-
-                                {isMusic && (
-                                    <div className="bg-gray-50 p-4 rounded border border-gray-200 space-y-4">
-                                        <h3 className="font-bold text-sm text-gray-800 flex items-center gap-2">
-                                            <i className="fas fa-music text-blue-600"></i>
-                                            Music Metadata
-                                        </h3>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <input ref={singerRef} placeholder="Singer" className="col-span-1 px-3 py-2 bg-white border border-gray-300 rounded text-sm outline-none focus:border-blue-600" />
-                                            <input ref={composerRef} placeholder="Composer" className="col-span-1 px-3 py-2 bg-white border border-gray-300 rounded text-sm outline-none focus:border-blue-600" />
-                                            <input ref={castRef} placeholder="Cast (Comma separated)" className="col-span-2 px-3 py-2 bg-white border border-gray-300 rounded text-sm outline-none focus:border-blue-600" />
-                                        </div>
-                                    </div>
-                                )}
-
-
-                            </div>
-
-                        </div>
-                    </div>
-
-                    {/* RIGHT COLUMN: Sticky Preview */}
-                    <div className="w-96 hidden lg:block shrink-0">
-                        <div className="sticky top-6 bg-white rounded-2xl shadow-2xl border-4 border-blue-500 overflow-hidden ring-2 ring-red-500/20">
-                            {/* Video Player Placeholder */}
-                            <div className="aspect-video bg-black flex items-center justify-center relative cursor-pointer" onClick={() => contentRef.current?.click()}>
-                                {contentFile ? (
-                                    <video src={URL.createObjectURL(contentFile)} className="w-full h-full object-contain" controls />
-                                ) : (
-                                    <div className="text-center">
-                                        <i className="fas fa-cloud-upload-alt text-gray-500 text-3xl mb-2"></i>
-                                        <p className="text-xs text-gray-400">Click to Select Video</p>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="p-5 space-y-4 bg-white/50 backdrop-blur-sm">
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-xs font-bold text-gray-400 uppercase tracking-wider">
-                                        <span>Video Link</span>
-                                        <button
-                                            onClick={() => navigator.clipboard.writeText(videoLink)}
-                                            className="text-blue-600 hover:text-blue-700 transition-colors"
-                                            title="Copy link"
-                                        >
-                                            <i className="far fa-copy"></i>
-                                        </button>
-                                    </div>
-                                    <div className="bg-gradient-to-r from-blue-50 to-red-50 p-2 rounded-lg border-2 border-blue-200">
-                                        <p className="text-blue-600 text-xs font-mono truncate">{videoLink}</p>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-1">
-                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Filename</p>
-                                    <p className="text-sm text-gray-700 font-medium truncate">{contentFile?.name || 'No file selected'}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <input ref={contentRef} type="file" accept={contentType === 'audio' ? "audio/*" : "video/*"} className="hidden" onChange={handleContentUpload} />
-                    </div>
-                </div>
-            </div>
-
-            {/* Sticky Footer */}
-            <div className="h-16 border-t-4 border-blue-500 bg-white/95 backdrop-blur-xl flex items-center justify-between px-8 shrink-0 z-30 shadow-lg">
-                {/* Upload Status */}
-                <div className="flex items-center gap-2">
-                    {!contentFile && <i className="fas fa-exclamation-circle text-gray-400"></i>}
-                    {contentFile && <i className="fas fa-check-circle text-blue-500"></i>}
-                    <span className="text-xs text-gray-600">{contentFile ? 'Upload complete' : 'Changes saved'}</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-
+        <div className="min-h-screen bg-[#F9F9F9] font-sans flex flex-col">
+            {/* Topbar - Studio Pro Style */}
+            <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-30 shadow-sm">
+                <div className="flex items-center space-x-3">
                     <button
-                        onClick={onPublish}
-                        className={`px-8 py-3 rounded-xl text-sm font-bold text-white uppercase tracking-wider shadow-lg hover:shadow-2xl hover:-translate-y-1 active:translate-y-0 transition-all duration-200 flex items-center gap-2 ${isUploading || !title || !contentFile ? 'bg-gray-300 cursor-not-allowed shadow-none transform-none' : 'bg-gradient-to-r from-red-600 via-red-500 to-blue-600 hover:from-red-500 hover:via-blue-500 hover:to-red-500'}`}
+                        className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg mr-2"
+                        onClick={() => setIsMobileMenuOpen(true)}
                     >
-                        {isUploading ? <><i className="fas fa-circle-notch fa-spin"></i> Publishing...</> : <><i className="fas fa-rocket"></i> Publish</>}
+                        <i className="fas fa-bars text-xl"></i>
                     </button>
+
+                    <div className="w-8 h-8 rounded bg-red-600 flex items-center justify-center text-white font-bold text-xs shadow-md">
+                        ▶
+                    </div>
+                    <span className="text-xl font-bold text-gray-800 hidden md:block tracking-tight pointer-events-none">
+                        Studio <span className="text-red-600">Pro</span>
+                    </span>
+                    <span className="text-gray-300 mx-2 text-xl font-light">|</span>
+                    <span className="text-gray-600 font-medium">Upload</span>
+                </div>
+                <div className="flex items-center space-x-6">
+                    <div className="flex items-center space-x-4">
+                        <button className="relative p-2 text-gray-400 hover:text-red-600 transition-colors">
+                            <i className="fas fa-bell text-lg"></i>
+                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-600 rounded-full border-2 border-white"></span>
+                        </button>
+                        <div className="h-6 w-px bg-gray-200 mx-2"></div>
+                        <ProfileMenu />
+                    </div>
                 </div>
             </div>
 
-            {/* Modals */}
-            {showSuccessModal && (
-                <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden animate-fade-in-up">
-                        <div className="p-6 text-center border-b border-gray-100">
-                            <div className="w-16 h-16 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
-                                <i className="fas fa-check"></i>
+            <div className="flex flex-1 pt-0">
+                {/* Sidebar - Studio Pro Style */}
+                <div className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col fixed h-full z-20 top-16 shadow-none">
+                    <div className="p-6">
+                        <div className="flex flex-col items-center mb-8">
+                            <div className="w-20 h-20 rounded-full border-2 border-red-500 p-1 mb-3">
+                                {user?.avatarUrl ? (
+                                    <img src={user.avatarUrl} alt="User Avatar" className="w-full h-full rounded-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full rounded-full bg-gradient-to-tr from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-3xl">
+                                        {user?.fullName?.charAt(0).toUpperCase() || 'C'}
+                                    </div>
+                                )}
                             </div>
-                            <h2 className="text-xl font-bold text-gray-900">Video published!</h2>
-                            <p className="text-gray-500 mt-1">Your video has been uploaded and processed.</p>
+                            <h3 className="font-bold text-lg text-gray-900">{user?.fullName || 'Creator'}</h3>
+                            <p className="text-xs text-gray-500 uppercase tracking-wider mt-1">{getCreatorLabel()}</p>
                         </div>
-                        <div className="p-6 bg-gray-50 flex gap-4">
-                            <div className="w-40 aspect-video bg-black rounded overflow-hidden">
-                                {thumbnailPreview && <img src={thumbnailPreview} className="w-full h-full object-cover" />}
+                    </div>
+
+                    <nav className="flex-1 px-4">
+                        <ul className="space-y-2">
+                            <li>
+                                <a href="/CreatorDashboard" className="flex items-center space-x-3 px-4 py-3 rounded-lg font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all border-l-4 border-transparent hover:border-red-500">
+                                    <i className="fas fa-columns text-sm w-5 text-center"></i>
+                                    <span>Dashboard</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="/ContentUploadPage" className="flex items-center space-x-3 px-4 py-3 rounded-lg font-medium text-white bg-red-600 shadow-lg shadow-red-900/20 transition-all border-l-4 border-transparent">
+                                    <i className="fas fa-video text-sm w-5 text-center"></i>
+                                    <span>Content</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="/creator/analytics" className="flex items-center space-x-3 px-4 py-3 rounded-lg font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all border-l-4 border-transparent hover:border-red-500">
+                                    <i className="fas fa-chart-line text-sm w-5 text-center"></i>
+                                    <span>Analytics</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="/creator/settings" className="flex items-center space-x-3 px-4 py-3 rounded-lg font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all border-l-4 border-transparent hover:border-red-500">
+                                    <i className="fas fa-cog text-sm w-5 text-center"></i>
+                                    <span>Settings</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+
+                    {/* Footer Info */}
+                    <div className="p-4 border-t border-gray-100 text-center">
+                        <p className="text-xs text-gray-400">© 2024 Vital Studio</p>
+                    </div>
+                </div>
+
+                {/* Main Content Area */}
+                <div className="flex-1 md:ml-64 p-8 overflow-y-auto bg-[#F9F9F9]">
+                    <div className="max-w-6xl mx-auto pb-12">
+
+                        {/* Page Header */}
+                        <div className="flex items-center justify-between mb-8">
+                            <div>
+                                <h1 className="text-3xl font-bold text-gray-900">Upload Content</h1>
+                                <p className="text-gray-500 mt-1">Publish your latest videos or music tracks to your audience.</p>
                             </div>
-                            <div className="flex-1 space-y-2">
-                                <p className="text-sm text-gray-500 uppercase font-bold">Shareable Link</p>
-                                <div className="flex items-center bg-white border border-gray-300 rounded px-3 py-2">
-                                    <span className="flex-1 text-sm text-blue-600 truncate">{videoLink}</span>
+                            {uploadProgress > 0 && uploadProgress < 100 && (
+                                <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm">
+                                    <div className="w-5 h-5 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                                    <span className="text-sm font-bold text-gray-700">Uploading... {uploadProgress}%</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Main Upload Card */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                            {/* Steps / Tabs */}
+                            <div className="border-b border-gray-200 bg-gray-50/50">
+                                <div className="flex items-center px-6">
                                     <button
-                                        onClick={() => navigator.clipboard.writeText(videoLink)}
-                                        className="text-gray-400 hover:text-gray-600"
-                                        title="Copy link"
+                                        onClick={() => setActiveTab('video')}
+                                        className={`px-6 py-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'video'
+                                            ? 'border-red-600 text-red-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                                            }`}
                                     >
-                                        <i className="far fa-copy"></i>
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${activeTab === 'video' ? 'bg-red-100 text-red-600' : 'bg-gray-200 text-gray-600'}`}>1</div>
+                                        Upload File
+                                    </button>
+                                    <button
+                                        onClick={() => contentFile && setActiveTab('details')}
+                                        disabled={!contentFile}
+                                        className={`px-6 py-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'details'
+                                            ? 'border-red-600 text-red-600'
+                                            : !contentFile ? 'border-transparent text-gray-300 cursor-not-allowed' : 'border-transparent text-gray-500 hover:text-gray-700'
+                                            }`}
+                                    >
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${activeTab === 'details' ? 'bg-red-100 text-red-600' : (!contentFile ? 'bg-gray-100 text-gray-300' : 'bg-gray-200 text-gray-600')}`}>2</div>
+                                        Details & Publish
                                     </button>
                                 </div>
                             </div>
+
+                            <div className="p-8">
+                                {/* Step 1: Upload */}
+                                <div className={`${activeTab === 'video' ? 'block' : 'hidden'}`}>
+                                    <h2 className="text-xl font-bold text-gray-900 mb-6">Select your content</h2>
+
+                                    <div
+                                        className={`relative border-2 border-dashed rounded-xl p-16 text-center transition-all cursor-pointer group ${dragActive ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-gray-50 hover:bg-white hover:border-red-300'
+                                            }`}
+                                        onDragEnter={handleDrag}
+                                        onDragLeave={handleDrag}
+                                        onDragOver={handleDrag}
+                                        onDrop={handleDrop}
+                                        onClick={() => fileInputRef.current?.click()}
+                                    >
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            className="hidden"
+                                            onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
+                                            accept="video/*,audio/*"
+                                        />
+
+                                        <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm group-hover:scale-110 transition-transform duration-300">
+                                            <i className="fas fa-cloud-upload-alt text-4xl text-red-500"></i>
+                                        </div>
+
+                                        <h3 className="text-2xl font-bold text-gray-800 mb-2">Drag & Drop content here</h3>
+                                        <p className="text-gray-500 mb-8 max-w-sm mx-auto">
+                                            Supports MP4, MOV, MP3, WAV and other standard media formats.
+                                        </p>
+
+                                        <button className="px-8 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-lg hover:shadow-red-500/30 transition-all transform hover:-translate-y-1">
+                                            Select Files
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Step 2: Details */}
+                                <div className={`${activeTab === 'details' ? 'block' : 'hidden'}`}>
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                        <div className="lg:col-span-2 space-y-6">
+                                            <div>
+                                                <label className="block text-sm font-bold text-gray-700 mb-2">Title <span className="text-red-500">*</span></label>
+                                                <input
+                                                    type="text"
+                                                    value={title}
+                                                    onChange={(e) => setTitle(e.target.value)}
+                                                    placeholder="Enter a catchy title..."
+                                                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all font-medium text-gray-900 placeholder-gray-400"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-bold text-gray-700 mb-2">Description</label>
+                                                <textarea
+                                                    value={description}
+                                                    onChange={(e) => setDescription(e.target.value)}
+                                                    placeholder="Tell your viewers about your content..."
+                                                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all font-medium text-gray-900 placeholder-gray-400 h-32 resize-none"
+                                                />
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-6">
+                                                <div>
+                                                    <label className="block text-sm font-bold text-gray-700 mb-2">Thumbnail</label>
+                                                    <div
+                                                        className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-red-400 hover:bg-gray-50 transition-all"
+                                                        onClick={() => thumbnailInputRef.current?.click()}
+                                                    >
+                                                        <input
+                                                            ref={thumbnailInputRef}
+                                                            type="file"
+                                                            className="hidden"
+                                                            accept="image/*"
+                                                            onChange={handleThumbnailSelect}
+                                                        />
+                                                        {thumbnailPreview ? (
+                                                            <div className="relative aspect-video rounded overflow-hidden">
+                                                                <img src={thumbnailPreview} alt="Thumbnail" className="w-full h-full object-cover" />
+                                                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                                                    <i className="fas fa-pen text-white text-lg"></i>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="py-6">
+                                                                <i className="fas fa-image text-2xl text-gray-400 mb-2"></i>
+                                                                <p className="text-xs text-gray-500 font-medium">Upload Image</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-bold text-gray-700 mb-2">Quality</label>
+                                                    <div className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-lg font-medium text-gray-500 cursor-not-allowed flex items-center justify-between">
+                                                        <span>{videoQuality}</span>
+                                                        <span className="text-xs bg-gray-200 px-2 py-1 rounded text-gray-600">Auto-detected</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="lg:col-span-1">
+                                            <div className="sticky top-24 space-y-6">
+                                                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Preview</h3>
+
+                                                {/* Preview Card Styled like Recent Uploads */}
+                                                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden group">
+                                                    <div className="aspect-video bg-gray-100 relative group-hover:brightness-95 transition-all">
+                                                        {contentFile ? (
+                                                            thumbnailPreview ? (
+                                                                <img src={thumbnailPreview} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                                                                    <i className={`fas ${contentFile.type.startsWith('audio') ? 'fa-music' : 'fa-video'} text-4xl text-gray-400`}></i>
+                                                                </div>
+                                                            )
+                                                        ) : (
+                                                            <div className="w-full h-full bg-gray-100"></div>
+                                                        )}
+                                                        <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-0.5 rounded font-bold">
+                                                            {videoQuality}
+                                                        </div>
+                                                    </div>
+                                                    <div className="p-4">
+                                                        <h4 className="font-bold text-gray-900 line-clamp-1 mb-1">{title || 'Your Title Here'}</h4>
+                                                        <p className="text-xs text-gray-500 mb-3">{user?.fullName || 'Channel Name'}</p>
+                                                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                                                            <span><i className="fas fa-clock mr-1"></i> Just now</span>
+                                                            <span>•</span>
+                                                            <span><i className="fas fa-eye mr-1"></i> 0 views</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <button
+                                                    onClick={onPublish}
+                                                    disabled={isUploading || !title}
+                                                    className={`w-full py-4 text-white font-bold rounded-xl shadow-lg transition-all transform flex items-center justify-center gap-2 ${isUploading
+                                                        ? 'bg-gray-400 cursor-not-allowed'
+                                                        : 'bg-red-600 hover:bg-red-700 hover:shadow-red-500/30 hover:-translate-y-1'
+                                                        }`}
+                                                >
+                                                    {isUploading ? (
+                                                        <>
+                                                            <i className="fas fa-circle-notch fa-spin"></i>
+                                                            Publishing...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <i className="fas fa-paper-plane"></i>
+                                                            Publish Now
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="p-4 border-t border-gray-100 flex justify-end">
-                            <button onClick={() => window.location.href = '/CreatorDashboard'} className="px-6 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-700">Close</button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Success Modal */}
+            {showSuccessModal && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl transform scale-100 transition-all text-center">
+                        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <i className="fas fa-check text-4xl text-green-500 animate-bounce-short"></i>
+                        </div>
+                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Upload Successful!</h2>
+                        <p className="text-gray-600 mb-6">Your content has been published and is now live on your channel.</p>
+
+                        <div className="bg-gray-50 rounded-lg p-3 mb-6 flex items-center justify-between border border-gray-200">
+                            <code className="text-xs text-gray-500 font-mono truncate max-w-[200px]">{`${window.location.origin}/watch/${uploadedContentId}`}</code>
+                            <button
+                                className="text-red-600 font-bold text-xs hover:text-red-700 uppercase"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(`${window.location.origin}/watch/${uploadedContentId}`);
+                                    showSuccess('Link copied!');
+                                }}
+                            >
+                                Copy
+                            </button>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => navigate('/CreatorDashboard')}
+                                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-xl transition-colors"
+                            >
+                                Dashboard
+                            </button>
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors shadow-lg hover:shadow-red-500/30"
+                            >
+                                Upload Another
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
+            <MobileSidebar
+                isOpen={isMobileMenuOpen}
+                onClose={() => setIsMobileMenuOpen(false)}
+                user={user}
+                title={
+                    <span className="text-xl font-bold text-gray-800">
+                        Studio <span className="text-red-600">Pro</span>
+                    </span>
+                }
+                links={[
+                    { icon: 'fa-columns', label: 'Dashboard', path: '/CreatorDashboard' },
+                    { icon: 'fa-video', label: 'Content', path: '/ContentUploadPage', active: true },
+                    { icon: 'fa-chart-line', label: 'Analytics', path: '/creator/analytics' },
+                    { icon: 'fa-cog', label: 'Settings', path: '/creator/settings' },
+                ]}
+            />
+
+            {/* Hidden Video Element for Metadata Extraction */}
+            <video
+                ref={hiddenVideoRef}
+                style={{ display: 'none' }}
+                onLoadedMetadata={(e) => {
+                    const video = e.target as HTMLVideoElement;
+                    const height = video.videoHeight;
+                    const width = video.videoWidth;
+
+                    let quality = '480p'; // Default fallback
+                    if (height >= 2160 || width >= 3840) quality = '4K';
+                    else if (height >= 1440 || width >= 2560) quality = '2K';
+                    else if (height >= 1080 || width >= 1920) quality = '1080p';
+                    else if (height >= 720 || width >= 1280) quality = '720p';
+
+                    setVideoQuality(quality);
+                    // Clean up memory
+                    URL.revokeObjectURL(video.src);
+                }}
+            />
+
             {/* Toast Notifications */}
-            <div className="fixed top-6 right-6 z-[100] space-y-3">
+            <div className="fixed top-6 right-6 z-[120] space-y-3">
                 {toasts.map(toast => (
                     <Toast
                         key={toast.id}
@@ -398,7 +598,7 @@ const ContentUploadPage: React.FC = () => {
                     />
                 ))}
             </div>
-        </div>
+        </div >
     );
 };
 

@@ -12,6 +12,10 @@ type ContentItem = {
     views?: number;
     category?: string;
     type?: 'video' | 'music' | 'podcast';
+    quality?: string;
+    isHDR?: boolean;
+    contentUrl?: string;
+    tags?: string[];
 };
 
 const UserDashboard: React.FC = () => {
@@ -29,6 +33,12 @@ const UserDashboard: React.FC = () => {
     // Auth State
     const [user, setUser] = useState<any>(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [showInfoModal, setShowInfoModal] = useState(false);
+    const [heroMediaError, setHeroMediaError] = useState(false);
+
+    useEffect(() => {
+        setHeroMediaError(false);
+    }, [featuredContent]);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -63,19 +73,40 @@ const UserDashboard: React.FC = () => {
         }
     };
 
+    // Placeholder images for when thumbnail is missing
+    const PLACEHOLDER_IMAGES = [
+        "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2670&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?q=80&w=2670&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?q=80&w=1000&auto=format&fit=crop",
+    ];
+
+    const getRandomPlaceholder = (id: string) => {
+        // Use string id to consistently pick the same random image for the same item to avoid flickering
+        const index = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % PLACEHOLDER_IMAGES.length;
+        return PLACEHOLDER_IMAGES[index];
+    };
+
     const fetchContent = async () => {
         try {
             setLoading(true);
             // Fetch all public content
-            // In a real app, you'd have specific endpoints like /api/content/featured, /api/content/trending
             const res = await fetch(`${BASE_URL}/api/content`);
             if (res.ok) {
                 const data = await res.json();
-                const allContent: ContentItem[] = data.content || [];
+                // Map backend response (nested creatorId) to frontend model (flat creatorName)
+                const allContent: ContentItem[] = (data.content || []).map((item: any) => ({
+                    ...item,
+                    creatorName: item.creatorId?.fullName || item.creatorName || 'Unknown Creator',
+                    creatorType: item.creatorId?.creatorType
+                }));
 
                 if (allContent.length > 0) {
-                    // Mock data distribution for demo
-                    setFeaturedContent(allContent[0]);
+                    // Randomly select featured content
+                    const randomIndex = Math.floor(Math.random() * allContent.length);
+                    const randomFeatured = allContent[randomIndex];
+                    setFeaturedContent(randomFeatured);
+
                     setTrending(allContent.slice(0, 5));
                     setNewReleases(allContent.slice(5, 10));
                     setMusic(allContent.filter(c => c.type === 'music' || c.category === 'Music').slice(0, 10));
@@ -105,25 +136,25 @@ const UserDashboard: React.FC = () => {
                                 onClick={() => navigate(`/watch/${item._id}`)}
                                 className="flex-none w-[250px] md:w-[300px] aspect-video bg-gray-800 rounded-lg overflow-hidden relative transform transition-all duration-300 hover:scale-105 hover:z-20 cursor-pointer shadow-lg hover:shadow-blue-500/20 snap-start"
                             >
-                                {item.thumbnailUrl ? (
-                                    <img
-                                        src={item.thumbnailUrl}
-                                        alt={item.title}
-                                        className="w-full h-full object-cover"
-                                        loading="lazy"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
-                                        <i className={`fas ${item.type === 'music' ? 'fa-music' : 'fa-play'} text-3xl text-gray-700`}></i>
-                                    </div>
-                                )}
+                                <img
+                                    src={item.thumbnailUrl || getRandomPlaceholder(item._id)}
+                                    alt={item.title}
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.src = getRandomPlaceholder(item._id);
+                                    }}
+                                />
 
-                                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-4">
                                     <h3 className="text-white font-bold text-lg truncate">{item.title}</h3>
                                     <p className="text-gray-300 text-xs mt-1">{item.creatorName || 'Unknown Creator'}</p>
                                     <div className="flex items-center gap-3 mt-2 text-xs text-gray-400 font-medium">
                                         <span><i className="fas fa-play mr-1"></i>Watch Now</span>
                                         {item.views && <span>• {item.views} views</span>}
+                                        {item.quality && <span className="px-1 border border-gray-500 rounded text-[10px] text-gray-300">{item.quality}</span>}
+                                        {item.isHDR && <span className="px-1 bg-gray-700 text-white rounded text-[10px] font-bold">HDR</span>}
                                     </div>
                                 </div>
                             </div>
@@ -157,7 +188,6 @@ const UserDashboard: React.FC = () => {
                             <Link to="/userhome" className="hover:text-white transition-colors">Home</Link>
                             <Link to="/userhome?cat=video" className="hover:text-white transition-colors">Videos</Link>
                             <Link to="/userhome?cat=music" className="hover:text-white transition-colors">Music</Link>
-                            <Link to="/channels" className="hover:text-white transition-colors">Creators</Link>
                         </div>
                     </div>
 
@@ -185,34 +215,53 @@ const UserDashboard: React.FC = () => {
             {featuredContent && (
                 <div className="relative h-screen w-full">
                     <div className="absolute inset-0">
-                        {featuredContent.thumbnailUrl ? (
-                            <img src={featuredContent.thumbnailUrl} className="w-full h-full object-cover" alt="Hero" />
+                        {featuredContent.type === 'video' && featuredContent.contentUrl && !heroMediaError ? (
+                            <video
+                                src={`${featuredContent.contentUrl}#t=2`}
+                                className="w-full h-full object-cover"
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                preload="metadata"
+                                poster={featuredContent.thumbnailUrl || getRandomPlaceholder(featuredContent._id)}
+                                onError={() => setHeroMediaError(true)}
+                            />
                         ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-gray-900 via-purple-900 to-black"></div>
+                            <img
+                                src={featuredContent.thumbnailUrl || getRandomPlaceholder(featuredContent._id)}
+                                className="w-full h-full object-cover"
+                                alt="Hero"
+                                onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = getRandomPlaceholder(featuredContent._id);
+                                }}
+                            />
                         )}
                         {/* Complex Gradient Overlay for Readability */}
                         <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent"></div>
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-[#141414]/20 to-transparent"></div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-transparent to-transparent"></div>
                     </div>
 
-                    <div className="absolute inset-0 flex items-center">
-                        <div className="px-6 md:px-16 max-w-2xl mt-32 relative z-20">
-                            {/* Animated Badge */}
-                            <div className="mb-6 flex items-center gap-2 animate-fade-in-down">
-                                <span className="px-3 py-1 bg-gradient-to-r from-red-600 to-pink-600 text-white text-[10px] font-bold tracking-widest uppercase rounded-sm shadow-lg ring-1 ring-white/20">
-                                    N Series
-                                </span>
-                                <span className="text-gray-300 text-sm font-semibold tracking-wide uppercase border-l border-gray-500 pl-2 ml-1">Featured</span>
+                    <div className="absolute inset-0 flex items-center px-4 md:px-12">
+                        <div className="max-w-2xl pt-20">
+                            <div className="flex items-center gap-3 mb-4 animate-fade-in-up">
+                                <span className="text-red-600 font-bold tracking-widest text-sm border-l-4 border-red-600 pl-3">FEATURED</span>
                             </div>
-
-                            <h1 className="text-4xl md:text-7xl font-black mb-4 md:mb-6 leading-[1.1] md:leading-[0.9] text-white drop-shadow-2xl tracking-tight">
+                            <h1 className="text-4xl md:text-7xl font-black text-white mb-6 leading-tight drop-shadow-lg animate-fade-in-up delay-100 line-clamp-2 max-h-[1.2em] md:max-h-[2.5em] overflow-hidden">
                                 {featuredContent.title}
                             </h1>
 
-                            <div className="flex items-center gap-4 text-green-400 font-bold text-sm mb-6">
-                                <span>98% Match</span>
-                                <span className="text-gray-300 font-normal">2024</span>
-                                <span className="px-1.5 py-0.5 border border-gray-500 rounded text-[10px] text-gray-300">HD</span>
+                            <div className="flex items-center gap-4 text-gray-300 mb-8 font-medium animate-fade-in-up delay-200">
+                                <span className="text-green-400 font-bold">{new Date().getFullYear()}</span>
+                                {featuredContent.quality && (
+                                    <span className="px-1.5 py-0.5 border border-gray-500 rounded text-[10px] text-gray-300 uppercase">
+                                        {featuredContent.quality}
+                                    </span>
+                                )}
+                                {featuredContent.isHDR && (
+                                    <span className="px-1.5 py-0.5 bg-gray-700 text-white rounded text-[10px] font-bold">HDR</span>
+                                )}
                             </div>
 
                             <p className="text-gray-100 text-base md:text-xl mb-6 md:mb-8 line-clamp-3 font-medium leading-relaxed drop-shadow-md text-shadow">
@@ -226,9 +275,100 @@ const UserDashboard: React.FC = () => {
                                 >
                                     <i className="fas fa-play text-2xl"></i> Play
                                 </button>
-                                <button className="w-full md:w-auto px-8 py-3.5 bg-gray-500/40 backdrop-blur-md text-white font-bold text-xl rounded hover:bg-gray-500/60 transition-all flex items-center justify-center gap-3 hover:scale-105 active:scale-95 ring-1 ring-white/30">
+                                <button
+                                    onClick={() => setShowInfoModal(true)}
+                                    className="w-full md:w-auto px-8 py-3.5 bg-gray-500/40 backdrop-blur-md text-white font-bold text-xl rounded hover:bg-gray-500/60 transition-all flex items-center justify-center gap-3 hover:scale-105 active:scale-95 ring-1 ring-white/30">
                                     <i className="fas fa-info-circle text-2xl"></i> More Info
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* More Info Modal */}
+            {showInfoModal && featuredContent && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowInfoModal(false)}></div>
+                    <div className="bg-[#181818] rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl animate-scale-in">
+
+                        {/* Modal Close Button */}
+                        <button
+                            onClick={() => setShowInfoModal(false)}
+                            className="absolute top-4 right-4 z-20 w-10 h-10 bg-[#181818]/60 rounded-full flex items-center justify-center text-white hover:bg-white hover:text-black transition-colors"
+                        >
+                            <i className="fas fa-times text-xl"></i>
+                        </button>
+
+                        {/* Modal Header Image */}
+                        <div className="relative aspect-video w-full">
+                            <img
+                                src={featuredContent.thumbnailUrl || getRandomPlaceholder(featuredContent._id)}
+                                className="w-full h-full object-cover"
+                                alt={featuredContent.title}
+                                onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = getRandomPlaceholder(featuredContent._id);
+                                }}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-transparent to-transparent"></div>
+
+                            <div className="absolute bottom-0 left-0 p-8 w-full">
+                                <h2 className="text-3xl md:text-5xl font-black text-white mb-4 drop-shadow-lg">{featuredContent.title}</h2>
+                                <div className="flex items-center gap-4 text-green-400 font-bold text-sm">
+                                    <span className="text-gray-300 font-normal">{new Date().getFullYear()}</span>
+                                    {featuredContent.quality && (
+                                        <span className="px-1.5 py-0.5 border border-gray-500 rounded text-[10px] text-gray-300 uppercase">
+                                            {featuredContent.quality}
+                                        </span>
+                                    )}
+                                    {featuredContent.views !== undefined && (
+                                        <span className="text-white">{featuredContent.views} views</span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="p-8 grid md:grid-cols-[2fr,1fr] gap-8">
+                            <div>
+                                <div className="flex items-center gap-4 mb-6">
+                                    <button
+                                        onClick={() => navigate(`/watch/${featuredContent._id}`)}
+                                        className="px-8 py-3 bg-white text-black font-bold text-lg rounded hover:bg-white/90 transition-all flex items-center gap-2 hover:scale-105"
+                                    >
+                                        <i className="fas fa-play"></i> Play
+                                    </button>
+                                    <button
+                                        className="w-12 h-12 border-2 border-gray-500 rounded-full flex items-center justify-center text-gray-300 hover:border-white hover:text-white transition-colors"
+                                        title="Add to My List"
+                                    >
+                                        <i className="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                                <p className="text-gray-300 text-lg leading-relaxed mb-6">
+                                    {featuredContent.description || "No description available."}
+                                </p>
+                            </div>
+
+                            <div className="text-sm text-gray-400 space-y-2">
+                                <div>
+                                    <span className="block text-gray-500 font-semibold mb-1">Creator</span>
+                                    <span className="text-white hover:underline cursor-pointer">{featuredContent.creatorName}</span>
+                                </div>
+                                <div>
+                                    <span className="block text-gray-500 font-semibold mb-1">Genres</span>
+                                    <span className="text-white">
+                                        {featuredContent.category || 'Entertainment'}
+                                        {featuredContent.type && `, ${featuredContent.type === 'video' ? 'Video' : 'Music'}`}
+                                    </span>
+                                </div>
+                                {featuredContent.tags && featuredContent.tags.length > 0 && (
+                                    <div>
+                                        <span className="block text-gray-500 font-semibold mb-1">Tags</span>
+                                        <span className="text-white">{featuredContent.tags.join(', ')}</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

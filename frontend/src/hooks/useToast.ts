@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { ToastType } from '../components/Toast';
 
-interface ToastItem {
+export interface ToastItem {
     id: number;
     message: string;
     type: ToastType;

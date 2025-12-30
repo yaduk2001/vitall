@@ -7,6 +7,7 @@ const ContentPlayer: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const { showSuccess, showError } = useToast();
     const [content, setContent] = useState<any>(null);
+    const [error, setError] = useState<string | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const audioRef = useRef<HTMLAudioElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -15,6 +16,20 @@ const ContentPlayer: React.FC = () => {
     const [comments, setComments] = useState<any[]>([]);
     const [commentText, setCommentText] = useState('');
     const [isPostingComment, setIsPostingComment] = useState(false);
+    const [relatedContent, setRelatedContent] = useState<any[]>([]);
+
+    // Placeholder images for fallback
+    const PLACEHOLDER_IMAGES = [
+        "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2670&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?q=80&w=2670&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?q=80&w=1000&auto=format&fit=crop",
+    ];
+
+    const getRandomPlaceholder = (id: string) => {
+        const index = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % PLACEHOLDER_IMAGES.length;
+        return PLACEHOLDER_IMAGES[index];
+    };
 
     // Get referrer parameter from URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -24,6 +39,7 @@ const ContentPlayer: React.FC = () => {
     const getBackUrl = () => {
         if (referrer === 'creator') return '/CreatorDashboard';
         if (currentUser?.role === 'content_creator') return '/CreatorDashboard';
+        if (!isAuthenticated) return '/userhome';
         return '/home'; // Default to home for students
     };
 
@@ -52,6 +68,20 @@ const ContentPlayer: React.FC = () => {
                 const data = await res.json();
                 setContent(data);
 
+                // Fetch related content from same creator
+                if (data.creatorId) {
+                    const creatorId = typeof data.creatorId === 'object' ? data.creatorId._id : data.creatorId;
+                    const resRelated = await fetch(`${BASE_URL}/api/content?creatorId=${creatorId}`);
+                    if (resRelated.ok) {
+                        const dataRelated = await resRelated.json();
+                        // Filter out current video and limit to 5
+                        const related = (dataRelated.content || [])
+                            .filter((item: any) => item._id !== id)
+                            .slice(0, 5);
+                        setRelatedContent(related);
+                    }
+                }
+
                 // Fetch comments
                 const resComments = await fetch(`${BASE_URL}/api/comments/content/${id}`);
                 if (resComments.ok) {
@@ -60,6 +90,7 @@ const ContentPlayer: React.FC = () => {
                 }
             } catch (err) {
                 console.error(err);
+                setError(err instanceof Error ? err.message : 'Failed to load content');
             }
         }
         fetchContent();
@@ -148,11 +179,43 @@ const ContentPlayer: React.FC = () => {
         }
     };
 
-    const handleShare = () => {
-        const url = window.location.href;
-        navigator.clipboard.writeText(url);
-        showSuccess('Link copied to clipboard!');
+    const handleShare = async () => {
+        const baseUrl = (import.meta as any).env.PUBLIC_FRONTEND_URL || window.location.origin;
+        const url = `${baseUrl}/watch/${id}`;
+
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(url);
+            } else {
+                // Fallback for non-secure contexts (e.g. http localhost)
+                const textArea = document.createElement("textarea");
+                textArea.value = url;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                if (!successful) throw new Error('Copy failed');
+            }
+            showSuccess('Link copied to clipboard!');
+        } catch (err) {
+            console.error('Share failed:', err);
+            showError('Failed to copy link');
+        }
     };
+
+    if (error) return (
+        <div className="min-h-screen flex items-center justify-center text-white bg-black">
+            <div className="text-center">
+                <h2 className="text-2xl font-bold text-red-500 mb-2">Error Loading Content</h2>
+                <p className="text-gray-300 mb-4">{error}</p>
+                <a href="/userhome" className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 transition-colors">Go Back</a>
+            </div>
+        </div>
+    );
 
     if (!content) return <div className="min-h-screen flex items-center justify-center text-white bg-black">Loading...</div>;
 
@@ -160,9 +223,9 @@ const ContentPlayer: React.FC = () => {
     const meta = content.metadata || {};
 
     return (
-        <div className="min-h-screen bg-[#0f0f0f] text-white font-sans flex flex-col">
+        <div className="h-screen bg-[#0f0f0f] text-white font-sans flex flex-col overflow-hidden">
             {/* Navbar - Simplified for Theater Mode */}
-            <div className="h-16 flex items-center justify-between px-6 bg-[#0f0f0f] border-b border-gray-800 sticky top-0 z-50">
+            <div className="h-16 flex items-center justify-between px-6 bg-[#0f0f0f] border-b border-gray-800 shrink-0 z-50">
                 <div className="flex items-center space-x-4">
                     <a href={getBackUrl()} className="text-gray-400 hover:text-white"><i className="fas fa-arrow-left"></i></a>
                     <span className="font-bold text-lg tracking-tight">Studio Player</span>
@@ -178,9 +241,9 @@ const ContentPlayer: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex-1 flex flex-col lg:flex-row max-w-[1800px] mx-auto w-full p-6 gap-6">
+            <div className="flex-1 flex flex-col lg:flex-row max-w-[1800px] mx-auto w-full p-6 gap-6 h-[calc(100vh-4rem)] overflow-hidden">
                 {/* Main Content Area */}
-                <div className="lg:w-[70%] space-y-4">
+                <div className="flex-1 lg:w-[70%] space-y-4 h-full overflow-y-auto custom-scrollbar pr-2 pb-20">
                     {/* Player Container */}
                     <div className="w-full aspect-video bg-black rounded-xl overflow-hidden shadow-2xl relative group">
                         {isAudio ? (
@@ -243,7 +306,6 @@ const ContentPlayer: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Description & Channel */}
                     {/* Description & Channel */}
                     <div className="bg-[#1f1f1f] rounded-xl p-4 mt-4">
                         <div className="flex items-center justify-between mb-2">
@@ -359,7 +421,7 @@ const ContentPlayer: React.FC = () => {
                 </div>
 
                 {/* Sidebar: Metadata & Credits */}
-                <div className="lg:w-[30%] space-y-6">
+                <div className="lg:w-[30%] space-y-6 h-full overflow-y-auto custom-scrollbar pl-2 pb-20">
 
                     {/* Credits Card (Only for Music/Rich Metadata) */}
                     {(meta.singer || meta.composer || meta.cast) && (
@@ -416,22 +478,41 @@ const ContentPlayer: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Placeholder for related content */}
-                    <div className="space-y-2">
+                    {/* Related Content List */}
+                    <div className="space-y-4">
                         <h3 className="font-bold text-gray-400 text-sm uppercase">More from this creator</h3>
-                        {[1, 2, 3].map((i) => (
-                            <div key={i} className="flex gap-2 group cursor-pointer">
-                                <div className="w-32 h-16 bg-gray-800 rounded-lg overflow-hidden relative">
-                                    {/* Placeholder generic thumb */}
-                                </div>
-                                <div className="flex-1">
-                                    <div className="h-4 bg-gray-800 rounded w-3/4 mb-1"></div>
-                                    <div className="h-3 bg-gray-800 rounded w-1/2"></div>
-                                </div>
-                            </div>
-                        ))}
+                        {relatedContent.length > 0 ? (
+                            relatedContent.map((item) => (
+                                <a href={`/watch/${item._id}`} key={item._id} className="flex gap-3 group cursor-pointer hover:bg-white/5 p-2 rounded-lg transition-colors">
+                                    <div className="w-32 h-20 bg-gray-800 rounded-lg overflow-hidden relative shrink-0">
+                                        <img
+                                            src={item.thumbnailUrl || getRandomPlaceholder(item._id)}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                            onError={(e) => {
+                                                const target = e.target as HTMLImageElement;
+                                                target.src = getRandomPlaceholder(item._id);
+                                            }}
+                                        />
+                                        <div className="absolute bottom-1 right-1 bg-black/80 px-1 rounded text-[10px] text-white">
+                                            {item.type === 'video' ? 'Video' : 'Audio'}
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                        <h4 className="font-bold text-sm text-gray-200 line-clamp-2 leading-tight group-hover:text-white transition-colors">
+                                            {item.title}
+                                        </h4>
+                                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                                            <span>{item.views || 0} views</span>
+                                            <span>•</span>
+                                            <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                    </div>
+                                </a>
+                            ))
+                        ) : (
+                            <div className="text-gray-500 text-sm italic">No other content found.</div>
+                        )}
                     </div>
-
                 </div>
             </div>
         </div >

@@ -5,10 +5,12 @@ import logoImage from '../assets/logo.jpg';
 const LandingPage: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const navigate = useNavigate();
 
   const handleBrowseClick = (e: React.MouseEvent) => {
-    // Guest browsing allowed: Navigate to UserDashboard
+    e.preventDefault();
+    // Allow everyone (including guests) to browse content on the UserDashboard
     navigate('/userhome');
   };
 
@@ -252,7 +254,133 @@ const LandingPage: React.FC = () => {
         </div>
       </footer>
 
+      {/* Custom Auth Modal */}
+      {showAuthModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <div className="modal-icon">🔒</div>
+              <h3 className="modal-title">Access Restricted</h3>
+            </div>
+            <p className="modal-message">
+              Only registered students can access the courses. Please register as a student to explore our content.
+            </p>
+            <div className="modal-actions">
+              <button
+                className="modal-btn secondary"
+                onClick={() => setShowAuthModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="modal-btn primary"
+                onClick={() => navigate('/register')}
+              >
+                Register Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
+        /* Modal Styles */
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.6);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          animation: fadeIn 0.2s ease-out;
+        }
+
+        .modal-content {
+          background: white;
+          padding: 32px;
+          border-radius: 20px;
+          max-width: 400px;
+          width: 90%;
+          text-align: center;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+          transform: scale(0.9);
+          animation: scaleUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        .modal-header {
+          margin-bottom: 16px;
+        }
+
+        .modal-icon {
+          font-size: 40px;
+          margin-bottom: 16px;
+        }
+
+        .modal-title {
+          font-size: 24px;
+          font-weight: 700;
+          color: #1e3a8a;
+        }
+
+        .modal-message {
+          color: #64748b;
+          line-height: 1.6;
+          margin-bottom: 24px;
+          font-size: 16px;
+        }
+
+        .modal-actions {
+          display: flex;
+          gap: 12px;
+          justify-content: center;
+        }
+
+        .modal-btn {
+          padding: 12px 24px;
+          border-radius: 10px;
+          font-weight: 600;
+          font-size: 15px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          border: none;
+        }
+
+        .modal-btn.primary {
+          background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+          color: white;
+          box-shadow: 0 4px 12px rgba(30, 58, 138, 0.2);
+        }
+
+        .modal-btn.primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 16px rgba(30, 58, 138, 0.3);
+        }
+
+        .modal-btn.secondary {
+          background: #f1f5f9;
+          color: #64748b;
+        }
+
+        .modal-btn.secondary:hover {
+          background: #e2e8f0;
+          color: #1e293b;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes scaleUp {
+          from { transform: scale(0.9); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+
         * {
           margin: 0;
           padding: 0;

@@ -8,7 +8,7 @@ const router = express.Router();
 // POST /api/content - Upload new content
 router.post('/', authMiddleware, async (req, res) => {
     try {
-        const { title, description, type, thumbnailUrl, contentUrl, metadata, tags, duration } = req.body;
+        const { title, description, type, thumbnailUrl, contentUrl, metadata, tags, duration, quality, isHDR } = req.body;
 
         if (!title || !contentUrl) {
             return res.status(400).json({ error: 'Title and content URL are required' });
@@ -19,7 +19,7 @@ router.post('/', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: 'Only content creators can upload here' });
         }
 
-        const content = await Content.create({
+        const content = new Content({
             creatorId: req.user.id,
             title,
             description,
@@ -27,9 +27,41 @@ router.post('/', authMiddleware, async (req, res) => {
             thumbnailUrl,
             contentUrl,
             duration,
+            quality: quality || '',
+            isHDR: isHDR || false,
             metadata: metadata || {},
             tags: tags || []
         });
+
+        // Generate Custom ID for Content
+        if (req.user.role === 'content_creator' && req.user.creatorType) {
+            const prefixMap = {
+                'vlogger': 'VCONT',
+                'music_company': 'MCONT',
+                'corporate': 'CCONT',
+                'medical': 'HCONT'
+            };
+            const prefix = prefixMap[req.user.creatorType];
+            if (prefix) {
+                // Generate a unique 4-digit alphanumeric ID
+                for (let i = 0; i < 5; i++) {
+                    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase().padStart(4, '0');
+                    const candidate = `${prefix}-${randomSuffix}`;
+                    const exists = await Content.findOne({ customId: candidate });
+                    if (!exists) {
+                        content.customId = candidate;
+                        break;
+                    }
+                }
+                // Fallback if needed
+                if (!content.customId) {
+                    const fallbackSuffix = Date.now().toString(36).slice(-4).toUpperCase();
+                    content.customId = `${prefix}-${fallbackSuffix}`;
+                }
+            }
+        }
+
+        await content.save();
 
         res.status(201).json({ message: 'Content published successfully', content });
     } catch (err) {

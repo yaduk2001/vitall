@@ -1,24 +1,12 @@
-# Dependencies
-node_modules/
-
-# Environment Variables
+node_modules
 .env
-.env.*
-
-# Logs
-logs/
+.DS_Store
+coverage
+.nyc_output
+.vscode
+.idea
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Editor directories and files
-.idea
-.DS_Store
-.vscode/
+uploads

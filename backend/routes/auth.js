@@ -30,14 +30,45 @@ router.post('/register', async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const isApproved = role === 'student' || role === 'admin';
-    const user = await User.create({ fullName, email, passwordHash, role, creatorType, isApproved });
 
-    // Auto-create channel skeleton for tutors (organization role)
-    if (role === 'organization') {
+    // Generate Custom ID for Content Creators
+    let customId = undefined;
+    if (role === 'content_creator' && creatorType) {
+      const prefixMap = {
+        'vlogger': 'VLOG',
+        'music_company': 'MUS',
+        'corporate': 'CORP',
+        'medical': 'MEDI'
+      };
+      const prefix = prefixMap[creatorType];
+      if (prefix) {
+        // Generate a unique 4-digit alphanumeric ID
+        // Simple collision avoidance: try up to 5 times
+        for (let i = 0; i < 5; i++) {
+          const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase().padStart(4, '0');
+          const candidate = `${prefix}-${randomSuffix}`;
+          const exists = await User.findOne({ customId: candidate });
+          if (!exists) {
+            customId = candidate;
+            break;
+          }
+        }
+        if (!customId) {
+          // Fallback if collision persists (rare) - user can retry or use timestamp
+          const fallbackSuffix = Date.now().toString(36).slice(-4).toUpperCase();
+          customId = `${prefix}-${fallbackSuffix}`;
+        }
+      }
+    }
+
+    const user = await User.create({ fullName, email, passwordHash, role, creatorType, isApproved, customId });
+
+    // Auto-create channel for Organization OR Content Creator
+    if (role === 'organization' || role === 'content_creator') {
       try {
         await Channel.findOneAndUpdate(
           { tutorId: user._id },
-          { tutorId: user._id, name: fullName, bio: '', avatarUrl: user.avatarUrl || '', coverUrl: '' },
+          { tutorId: user._id, name: fullName, bio: '', avatarUrl: user.avatarUrl || '', coverUrl: '', role: role },
           { upsert: true, new: true, setDefaultsOnInsert: true }
         );
       } catch (e) {

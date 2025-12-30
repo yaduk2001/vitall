@@ -108,16 +108,32 @@ const Organization: React.FC = () => {
         setLoading(false);
       }
 
+      // Fetch Courses
       try {
         const res = await fetch(`${BASE_URL}/api/courses/by-tutor/${tutorId}`);
         const data = await res.json();
         const list = data.courses || [];
-        setCourses(list);
+        setCourses(prev => [...prev, ...list]); // Append to existing content (which might be videos)
         if (currentUser && currentUser.role === 'student') {
           setTimeout(() => updateEnrollmentButtonStates(), 100);
         }
       } catch (e) {
         console.error('Error fetching courses:', e);
+      }
+
+      // Fetch Video Content (for Creators)
+      try {
+        const res = await fetch(`${BASE_URL}/api/content?creatorId=${tutorId}`);
+        if (res.ok) {
+          const data = await res.json();
+          const videos = data.content || [];
+          // Map videos to a common structure or store separately
+          // For simplicity, we can mix them if the display logic handles it, or just use a separate state.
+          // Let's mix them but handle typing in the render.
+          setCourses(prev => [...prev, ...videos.map((v: any) => ({ ...v, isVideo: true }))]);
+        }
+      } catch (e) {
+        console.error('Error fetching content:', e);
       }
     })();
   }, [id]);
@@ -602,19 +618,26 @@ const Organization: React.FC = () => {
               <div className="course-mosaic">
                 {courses.map((course) => {
                   const BASE_URL = (import.meta as any).env.PUBLIC_BACKEND_URL || 'http://localhost:5000';
+                  // Unified render logic for Course OR Video
+                  const isVideo = (course as any).isVideo;
+                  const itemTitle = isVideo ? (course as any).title : course.title;
+                  const itemDesc = isVideo ? (course as any).description : course.description;
+                  const itemId = isVideo ? (course as any)._id : course.id;
+                  const itemCustomId = (course as any).customId; // Display Custom ID if available
+
                   const thumbnailUrl = course.thumbnailUrl
                     ? course.thumbnailUrl.startsWith('http')
                       ? course.thumbnailUrl
                       : course.thumbnailData
-                        ? `${BASE_URL}/api/files/${course.id}/thumbnail`
+                        ? `${BASE_URL}/api/files/${itemId}/thumbnail`
                         : `${BASE_URL}${course.thumbnailUrl}`
                     : '';
 
                   return (
-                    <article key={course.id} className="course-card">
+                    <article key={itemId} className="course-card">
                       <div className="card-media">
                         {thumbnailUrl ? (
-                          <img src={thumbnailUrl} alt={course.title} />
+                          <img src={thumbnailUrl} alt={itemTitle} />
                         ) : (
                           <div className="media-fallback">
                             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -625,19 +648,25 @@ const Organization: React.FC = () => {
                           </div>
                         )}
                         <div className="media-overlay">
-                          <a href={`/video/${course.id}`} className="overlay-btn">
+                          <a href={isVideo ? `/watch/${itemId}` : `/video/${itemId}`} className="overlay-btn">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                               <path d="M8 5v14l11-7z"></path>
                             </svg>
-                            Watch preview
+                            {isVideo ? 'Watch Video' : 'View Course'}
                           </a>
-                          <span className="badge">{course.modules?.length || 0} modules</span>
+                          {!isVideo && <span className="badge">{course.modules?.length || 0} modules</span>}
+                          {isVideo && (course as any).duration && <span className="badge">{Math.floor((course as any).duration / 60)}:{(course as any).duration % 60}</span>}
                         </div>
                       </div>
                       <div className="card-body">
-                        <a href={`/video/${course.id}`} className="course-title">{course.title}</a>
-                        {course.description && (
-                          <p className="course-snippet">{course.description.slice(0, 110)}...</p>
+                        {itemCustomId && (
+                          <div className="text-[10px] font-mono text-blue-600 mb-1 bg-blue-50 inline-block px-1 rounded border border-blue-100 uppercase tracking-wider">
+                            ID: {itemCustomId}
+                          </div>
+                        )}
+                        <a href={isVideo ? `/watch/${itemId}` : `/video/${itemId}`} className="course-title">{itemTitle}</a>
+                        {itemDesc && (
+                          <p className="course-snippet">{itemDesc.slice(0, 110)}...</p>
                         )}
                         <div className="card-footer">
                           <div className="course-meta">

@@ -31,6 +31,12 @@ const userSchema = new mongoose.Schema({
     enum: ['vlogger', 'music_company', 'corporate', 'medical', null],
     default: null
   },
+  customId: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true
+  },
   isApproved: {
     type: Boolean,
     default: function () {

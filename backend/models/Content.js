@@ -2,12 +2,15 @@ const mongoose = require('mongoose');
 
 const ContentSchema = new mongoose.Schema({
     creatorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    customId: { type: String, unique: true, sparse: true, trim: true },
     title: { type: String, required: true, trim: true },
     description: { type: String, default: '', trim: true },
     type: { type: String, enum: ['video', 'audio'], default: 'video' },
     thumbnailUrl: { type: String, default: '' },
     contentUrl: { type: String, required: true },
     duration: { type: Number, default: 0 },
+    quality: { type: String, default: '' }, // e.g., '4K', '1080p'
+    isHDR: { type: Boolean, default: false },
     views: { type: Number, default: 0 },
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     tags: [{ type: String }],

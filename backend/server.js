@@ -397,16 +397,9 @@ app.get('/api/analytics/summary/:tutorId', async (req, res) => {
 app.get('/api/courses/by-tutor/:tutorId', async (req, res) => {
   try {
     const tutorId = req.params.tutorId;
-    console.log('Fetching courses for tutorId:', tutorId);
-
     const courses = await Course.find({ tutorId: tutorId, isActive: true }).sort({ createdAt: -1 });
-    console.log(`Found ${courses.length} courses for tutorId: ${tutorId}`);
 
-    if (courses.length > 0) {
-      console.log('Sample course tutorId:', courses[0].tutorId.toString());
-      console.log('Requested tutorId:', tutorId);
-      console.log('TutorId match:', courses[0].tutorId.toString() === tutorId);
-    }
+
 
     res.json({ courses: courses.map(Course.format) });
   } catch (e) {
