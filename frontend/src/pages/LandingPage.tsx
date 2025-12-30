@@ -4,6 +4,7 @@ import logoImage from '../assets/logo.jpg';
 
 const LandingPage: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [showAuthModal, setShowAuthModal] = useState(false);
   const navigate = useNavigate();
@@ -117,17 +118,56 @@ const LandingPage: React.FC = () => {
 
       {/* Navigation */}
       <nav className="landing-nav">
-        <div className="nav-container">
+        <div className="nav-container relative">
           <Link to="/" className="nav-logo">
             <img src={logoImage} alt="SUPE AI" className="logo-img" />
             <span className="logo-text">SUPE AI</span>
           </Link>
-          <div className="nav-links">
+
+          {/* Desktop Navigation */}
+          <div className="nav-links hidden md:flex">
             <Link to="/home" className="nav-link" onClick={handleBrowseClick}>Browse Courses</Link>
             <Link to="/userhome" className="nav-link">Channels</Link>
             <Link to="/login" className="nav-link secondary">Sign In</Link>
             <Link to="/register" className="nav-link primary">Get Started</Link>
           </div>
+
+          {/* Mobile Menu Trigger - Unique Sphere/Icon */}
+          <button
+            className="md:hidden w-10 h-10 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 backdrop-blur-md border border-white/20 flex items-center justify-center relative overflow-hidden group shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-pulse-slow"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            <div className={`absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-20 transition-opacity duration-300 ${isMobileMenuOpen ? 'opacity-50' : ''}`}></div>
+            {isMobileMenuOpen ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-white z-10">
+                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-white z-10">
+                <circle cx="12" cy="12" r="3" fill="currentColor" />
+                <path d="M12 4v2M12 18v2M4 12h2M18 12h2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            )}
+          </button>
+
+          {/* Mobile Glassmorphic Dropdown */}
+          {isMobileMenuOpen && (
+            <div className="absolute top-full right-0 mt-4 w-64 p-4 rounded-2xl bg-[#0f0f0f]/80 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] flex flex-col gap-3 animate-fade-in-up z-50 md:hidden">
+              <Link to="/home" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-200 transition-all font-medium" onClick={handleBrowseClick}>
+                <span className="text-lg">📚</span> Browse Courses
+              </Link>
+              <Link to="/userhome" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-200 transition-all font-medium">
+                <span className="text-lg">📺</span> Channels
+              </Link>
+              <div className="h-px bg-white/10 my-1"></div>
+              <Link to="/login" className="flex items-center justify-center p-3 rounded-xl border border-white/10 text-white font-bold hover:bg-white/5 transition-all">
+                Sign In
+              </Link>
+              <Link to="/register" className="flex items-center justify-center p-3 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold shadow-lg hover:shadow-blue-500/25 transition-all">
+                Get Started
+              </Link>
+            </div>
+          )}
         </div>
       </nav>
 
