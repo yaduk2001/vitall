@@ -125,11 +125,11 @@ const LandingPage: React.FC = () => {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="nav-links hidden md:flex">
-            <Link to="/home" className="nav-link" onClick={handleBrowseClick}>Browse Courses</Link>
-            <Link to="/userhome" className="nav-link">Channels</Link>
-            <Link to="/login" className="nav-link secondary">Sign In</Link>
-            <Link to="/register" className="nav-link primary">Get Started</Link>
+          <div className="desktop-nav-links hidden md:flex items-center gap-6">
+            <Link to="/home" className="nav-link text-gray-300 hover:text-white transition-colors" onClick={handleBrowseClick}>Browse Courses</Link>
+            <Link to="/userhome" className="nav-link text-gray-300 hover:text-white transition-colors">Channels</Link>
+            <Link to="/login" className="nav-link secondary px-4 py-2 border border-white/20 rounded-lg hover:bg-white/10 transition-colors">Sign In</Link>
+            <Link to="/register" className="nav-link primary px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">Get Started</Link>
           </div>
 
           {/* Mobile Menu Trigger - Unique Sphere/Icon */}

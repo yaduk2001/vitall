@@ -65,7 +65,7 @@ const UserDashboard: React.FC = () => {
                     setUser(userData);
                     setIsAuthenticated(true);
                     // Security check: If student, redirect to Student Dashboard
-                    if (userData.role === 'student') navigate('/home');
+                    // if (userData.role === 'student') navigate('/home');
                 }
             } catch (e) {
                 console.error("Auth check failed", e);
