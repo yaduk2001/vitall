@@ -241,9 +241,9 @@ const ContentPlayer: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex-1 flex flex-col lg:flex-row max-w-[1800px] mx-auto w-full p-6 gap-6 h-[calc(100vh-4rem)] overflow-hidden">
+            <div className="flex flex-col lg:flex-row max-w-[1800px] mx-auto w-full p-6 gap-6 h-auto lg:h-[calc(100vh-4rem)] lg:overflow-hidden">
                 {/* Main Content Area */}
-                <div className="flex-1 lg:w-[70%] space-y-4 h-full overflow-y-auto custom-scrollbar pr-2 pb-20">
+                <div className="w-full lg:w-[70%] space-y-4 h-auto lg:h-full lg:overflow-y-auto custom-scrollbar pr-0 lg:pr-2 pb-10 lg:pb-20">
                     {/* Player Container */}
                     <div className="w-full aspect-video bg-black rounded-xl overflow-hidden shadow-2xl relative group">
                         {isAudio ? (
@@ -277,9 +277,13 @@ const ContentPlayer: React.FC = () => {
                                     if (!content.contentUrl) return '';
                                     if (content.contentUrl.startsWith('http')) return content.contentUrl;
                                     const baseUrl = (import.meta as any).env.PUBLIC_BACKEND_URL || 'http://localhost:5000';
-                                    const path = content.contentUrl.startsWith('/') ? content.contentUrl : `/${content.contentUrl}`;
+                                    let path = content.contentUrl;
+                                    // Fix windows path separators if present
+                                    path = path.replace(/\\/g, '/');
+                                    path = path.startsWith('/') ? path : `/${path}`;
                                     return `${baseUrl}${path}`;
                                 })()}
+                                crossOrigin="anonymous"
                                 poster={(() => {
                                     if (!content.thumbnailUrl) return '';
                                     if (content.thumbnailUrl.startsWith('http')) return content.thumbnailUrl;
@@ -421,7 +425,7 @@ const ContentPlayer: React.FC = () => {
                 </div>
 
                 {/* Sidebar: Metadata & Credits */}
-                <div className="lg:w-[30%] space-y-6 h-full overflow-y-auto custom-scrollbar pl-2 pb-20">
+                <div className="w-full lg:w-[30%] space-y-6 h-auto lg:h-full lg:overflow-y-auto custom-scrollbar pl-0 lg:pl-2 pb-20">
 
                     {/* Credits Card (Only for Music/Rich Metadata) */}
                     {(meta.singer || meta.composer || meta.cast) && (

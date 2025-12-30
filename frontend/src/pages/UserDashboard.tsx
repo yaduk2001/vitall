@@ -35,6 +35,7 @@ const UserDashboard: React.FC = () => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [showInfoModal, setShowInfoModal] = useState(false);
     const [heroMediaError, setHeroMediaError] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     useEffect(() => {
         setHeroMediaError(false);
@@ -197,12 +198,31 @@ const UserDashboard: React.FC = () => {
                             <i className="fas fa-search text-lg"></i>
                         </button>
 
+                        {/* Mobile Menu Trigger */}
+                        <button
+                            className="md:hidden w-8 h-8 rounded-full bg-white/10 flex items-center justify-center backdrop-blur-md border border-white/10"
+                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                        >
+                            <i className={`fas ${isMobileMenuOpen ? 'fa-times' : 'fa-bars'} text-white text-sm`}></i>
+                        </button>
+
+                        {/* Mobile Dropdown */}
+                        {isMobileMenuOpen && (
+                            <div className="absolute top-16 right-4 w-48 bg-[#1f1f1f] rounded-xl shadow-2xl border border-white/10 overflow-hidden md:hidden animate-fade-in-up">
+                                <div className="flex flex-col">
+                                    <Link to="/userhome" className="px-4 py-3 text-gray-200 hover:bg-white/5 text-sm font-medium">Home</Link>
+                                    <Link to="/userhome?cat=video" className="px-4 py-3 text-gray-200 hover:bg-white/5 text-sm font-medium">Videos</Link>
+                                    <Link to="/userhome?cat=music" className="px-4 py-3 text-gray-200 hover:bg-white/5 text-sm font-medium">Music</Link>
+                                </div>
+                            </div>
+                        )}
+
                         {isAuthenticated && user ? (
                             <ProfileMenu user={user} />
                         ) : (
                             <Link
                                 to="/login"
-                                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded flex items-center gap-2 transition-transform hover:scale-105"
+                                className="hidden md:flex px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded items-center gap-2 transition-transform hover:scale-105"
                             >
                                 Sign In
                             </Link>
